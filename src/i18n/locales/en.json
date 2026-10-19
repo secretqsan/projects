@@ -1,0 +1,35 @@
+{
+  "settings": {
+    "title": "Settings",
+    "subtitle": "Manage app preferences and view application information"
+  },
+  "appearance": {
+    "title": "Appearance",
+    "darkMode": "Dark Mode",
+    "darkModeDesc": "Switch to dark theme to protect your eyes",
+    "themeColor": "Theme Color",
+    "themeColorDesc": "Choose your preferred theme color"
+  },
+  "language": {
+    "title": "Language",
+    "description": "Select your preferred interface language",
+    "placeholder": "Please select a language"
+  },
+  "about": {
+    "title": "About",
+    "appName": "Projects",
+    "version": "Version",
+    "description": "A modern project management tool",
+    "developer": "Developer",
+    "license": "License"
+  },
+  "sponsor": {
+    "title": "Sponsor",
+    "description": "If you like this project, consider sponsoring to support the developer and keep the project maintained.",
+    "donate": "Donate",
+    "github": "GitHub",
+    "contact": "Contact",
+    "thanks": "Thanks to every supporter!"
+  },
+  "copyright": "© 2024 Projects. All rights reserved."
+}

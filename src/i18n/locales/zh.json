@@ -1,0 +1,35 @@
+{
+  "settings": {
+    "title": "设置",
+    "subtitle": "管理应用偏好和查看应用信息"
+  },
+  "appearance": {
+    "title": "外观",
+    "darkMode": "夜间模式",
+    "darkModeDesc": "切换深色主题以保护眼睛",
+    "themeColor": "主题色",
+    "themeColorDesc": "选择您喜欢的主题颜色"
+  },
+  "language": {
+    "title": "语言",
+    "description": "选择您偏好的界面语言",
+    "placeholder": "请选择语言"
+  },
+  "about": {
+    "title": "关于",
+    "appName": "Projects",
+    "version": "版本",
+    "description": "一款现代化的项目管理工具",
+    "developer": "开发者",
+    "license": "许可证"
+  },
+  "sponsor": {
+    "title": "赞助",
+    "description": "如果您喜欢这个项目，可以考虑赞助支持开发者，让项目能够持续维护和改进。",
+    "donate": "打赏开发者",
+    "github": "GitHub",
+    "contact": "联系作者",
+    "thanks": "感谢每一位支持者的贡献！"
+  },
+  "copyright": "© 2024 Projects. All rights reserved."
+}
