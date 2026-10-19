@@ -19,9 +19,14 @@
     "title": "关于",
     "appName": "Projects",
     "version": "版本",
-    "description": "一款现代化的项目管理工具",
+    "description": "本地优先的项目管理桌面应用，支持甘特图、看板、资源与任务表格。",
     "developer": "开发者",
-    "license": "许可证"
+    "developerName": "神秘的Q桑",
+    "license": "许可证",
+    "licenseName": "MIT",
+    "homepage": "主页",
+    "techStack": "技术栈",
+    "techStackValue": "Tauri 2 · Vue 3 · Vite · Pinia · Tailwind CSS 4"
   },
   "sponsor": {
     "title": "赞助",
@@ -31,5 +36,5 @@
     "contact": "联系作者",
     "thanks": "感谢每一位支持者的贡献！"
   },
-  "copyright": "© 2024 Projects. All rights reserved."
+  "copyright": "© 2026 神秘的Q桑. Released under the MIT License."
 }

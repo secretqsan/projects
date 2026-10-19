@@ -14,8 +14,12 @@ function deleteProject(projectId) {
   }
 }
 
-function copyProject(projectId) {
-  projectStore.copyProject(projectId)
+async function copyProject(projectId) {
+  const copied = await projectStore.copyProject(projectId)
+  if (copied?.filename) {
+    configStore.addToHistory(copied.filename)
+    projectStore.setCurrentProject(copied)
+  }
 }
 </script>
 

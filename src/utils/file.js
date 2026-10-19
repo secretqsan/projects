@@ -14,6 +14,55 @@ export async function selectFileToSave() {
   return await invoke('save_file_dialog')
 }
 
+function pathSeparator(path) {
+  return path.includes('\\') ? '\\' : '/'
+}
+
+function dirname(path) {
+  const sep = pathSeparator(path)
+  const index = path.lastIndexOf(sep)
+  return index === -1 ? '' : path.slice(0, index)
+}
+
+function basename(path) {
+  const sep = pathSeparator(path)
+  const index = path.lastIndexOf(sep)
+  return index === -1 ? path : path.slice(index + 1)
+}
+
+function joinPath(dir, name) {
+  if (!dir) return name
+  return `${dir}${pathSeparator(dir)}${name}`
+}
+
+async function fileExists(path) {
+  try {
+    await invoke('read_file', { path })
+    return true
+  } catch (error) {
+    const message = typeof error === 'string' ? error : (error?.message || String(error))
+    if (message.includes('NOT_FOUND')) return false
+    throw error
+  }
+}
+
+/** 在原文件同目录生成「xxx 副本.json」，已存在则追加序号 */
+export async function nextCopyFilePath(originalPath) {
+  const dir = dirname(originalPath)
+  const base = basename(originalPath)
+  const dot = base.lastIndexOf('.')
+  const stem = dot === -1 ? base : base.slice(0, dot)
+  const ext = dot === -1 ? '.json' : base.slice(dot)
+
+  let candidate = joinPath(dir, `${stem} 副本${ext}`)
+  let n = 2
+  while (await fileExists(candidate)) {
+    candidate = joinPath(dir, `${stem} 副本${n}${ext}`)
+    n += 1
+  }
+  return candidate
+}
+
 /**
  * 创建空项目结构
  */

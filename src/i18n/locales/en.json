@@ -19,9 +19,14 @@
     "title": "About",
     "appName": "Projects",
     "version": "Version",
-    "description": "A modern project management tool",
+    "description": "A local-first project management desktop app with Gantt, Kanban, resources, and a task table.",
     "developer": "Developer",
-    "license": "License"
+    "developerName": "secretqsan",
+    "license": "License",
+    "licenseName": "MIT",
+    "homepage": "Homepage",
+    "techStack": "Stack",
+    "techStackValue": "Tauri 2 · Vue 3 · Vite · Pinia · Tailwind CSS 4"
   },
   "sponsor": {
     "title": "Sponsor",
@@ -31,5 +36,5 @@
     "contact": "Contact",
     "thanks": "Thanks to every supporter!"
   },
-  "copyright": "© 2024 Projects. All rights reserved."
+  "copyright": "© 2026 secretqsan. Released under the MIT License."
 }

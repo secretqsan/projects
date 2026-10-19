@@ -1,138 +1,113 @@
-# Projects - 现代化项目管理工具
+# Projects
 
-一款基于 Tauri + Vue 3 构建的现代化项目管理桌面应用，提供直观的甘特图、任务看板、资源管理等功能，帮助团队高效管理项目进度。
+本地优先的项目管理桌面应用。基于 Tauri 2 与 Vue 3，提供甘特图、看板、资源管理和可编辑任务表格，项目数据以 JSON 文件保存在本机。
 
-![License](https://img.shields.io/badge/license-LGPL--2.1-blue.svg)
+![License](https://img.shields.io/badge/license-MIT-blue.svg)
 ![Tauri](https://img.shields.io/badge/Tauri-2.0-FFC131?logo=tauri)
 ![Vue](https://img.shields.io/badge/Vue-3.5-4FC08D?logo=vue.js)
 ![Version](https://img.shields.io/badge/version-0.1.0-green.svg)
 
 ## ✨ 功能特性
 
-- 📊 **甘特图视图** - 直观展示项目时间线、任务依赖关系和进度
-- 📋 **任务看板** - 支持拖拽的 Kanban 看板，灵活管理任务状态
-- 👥 **资源管理** - 分配和跟踪团队成员的工作负载
-- 📈 **数据表格** - 强大的任务列表编辑功能，支持批量操作
-- 🌙 **深色模式** - 支持浅色/深色主题切换，保护眼睛
-- 🌍 **多语言支持** - 支持中文和英文界面
-- 💾 **本地存储** - 项目数据本地保存，保护隐私
-- 🔄 **自动保存** - 自动保存项目历史，防止数据丢失
+- 📊 **甘特图** — 时间线浏览、任务条拖拽调整、依赖连线、今日高亮、缩放与时间跨度调节
+- 📋 **任务表格** — 行内编辑、层级缩进、折叠、拖拽排序、多选与批量操作，含备注列
+- 🗂️ **看板** — 按待办 / 进行中 / 逾期 / 已完成分组，支持拖拽改状态与进度操作
+- 👥 **资源管理** — 资源组与资源维护，可分配到任务
+- 💾 **本地存储** — 打开 / 新建 / 拖放 JSON 项目文件，保存时自动校验与修复
+- 🎨 **外观与语言** — 浅色 / 深色模式、主题色、中英界面
 
-## 🚀 技术栈
+## 🛠️ 技术栈
 
-- **前端框架**: Vue 3 + Composition API
-- **桌面框架**: Tauri 2.0
-- **构建工具**: Vite 6
-- **状态管理**: Pinia + 持久化插件
-- **UI 组件**: PrimeVue + Tailwind CSS 4
-- **数据表格**: AG Grid + Handsontable
-- **国际化**: Vue I18n
-- **开发语言**: JavaScript / Rust
+| 层级 | 技术 |
+|------|------|
+| 🖥️ 桌面 | Tauri 2 |
+| ⚡ 前端 | Vue 3、Vite 8、Pinia、Vue I18n |
+| 🎨 样式 | Tailwind CSS 4、PrimeIcons |
+| 🦀 后端 | Rust（文件读写与系统对话框） |
 
-## 📦 安装与运行
+## 📦 环境要求
 
-### 环境要求
+- [Bun](https://bun.sh/)（或 Node.js 18+）
+- [Rust](https://www.rust-lang.org/)（Tauri 构建需要）
 
-- [Node.js](https://nodejs.org/) (推荐 18+)
-- [Bun](https://bun.sh/) 或 npm/yarn
-- [Rust](https://www.rust-lang.org/) (用于 Tauri 后端)
-
-### 开发环境
+## 🚀 开发与构建
 
 ```bash
-# 克隆项目
-git clone <repository-url>
-cd projects
-
 # 安装依赖
 bun install
 
-# 启动开发服务器
+# 开发模式
 bun run tauri dev
-```
 
-### 构建生产版本
-
-```bash
-# 构建桌面应用
+# 生产构建
 bun run tauri build
 ```
 
-构建完成后，安装包将位于 `src-tauri/target/release/bundle/` 目录下。
+安装包输出目录：`src-tauri/target/release/bundle/`
+
+仅前端预览（无桌面壳）：
+
+```bash
+bun run dev
+```
 
 ## 📁 项目结构
 
 ```
 projects/
-├── src/                    # 前端源代码
-│   ├── components/         # Vue 组件
-│   │   ├── gantt/         # 甘特图组件
-│   │   ├── settings/      # 设置页面组件
-│   │   └── ui/            # 通用 UI 组件
-│   ├── stores/            # Pinia 状态管理
-│   ├── i18n/              # 国际化配置
-│   ├── utils/             # 工具函数
-│   ├── App.vue            # 根组件
-│   └── main.js            # 入口文件
-├── src-tauri/             # Tauri 后端代码
-│   ├── src/               # Rust 源代码
-│   ├── icons/             # 应用图标
-│   └── tauri.conf.json    # Tauri 配置
-├── public/                # 静态资源
-├── dist/                  # 构建输出
-└── example_project.json   # 示例项目数据
+├── src/                      # 前端
+│   ├── components/
+│   │   ├── gantt/            # 甘特图
+│   │   ├── settings/         # 设置 / 关于
+│   │   └── ui/               # 通用组件
+│   ├── stores/               # Pinia 状态
+│   ├── i18n/                 # 中英国际化
+│   ├── utils/                # 日期、文件等工具
+│   ├── App.vue
+│   └── main.js
+├── src-tauri/                # Tauri / Rust
+├── demo/
+│   └── example_project.json  # 示例项目
+├── public/
+└── dist/
 ```
 
-## 🎯 使用指南
+## 🎯 使用说明
 
-### 创建新项目
+### 📂 打开或新建项目
 
-1. 点击菜单栏的"文件" -> "新建项目"
-2. 输入项目名称和描述
-3. 开始添加任务和设置时间线
+1. 左侧导航点击 **打开项目**，或将 `.json` 文件拖入侧边栏
+2. 点击 **+** 选择保存路径以新建空项目
+3. 双击项目名可重命名；右键菜单可复制或从列表中移除
 
-### 管理任务
+### ✅ 任务管理
 
-- 在甘特图中拖动任务条调整时间
-- 在看板视图中拖拽任务卡片改变状态
-- 使用数据表格批量编辑任务属性
+- 📊 **甘特图**：拖动任务条改日期，端点连线建立依赖；工具栏可开始任务、设置进度或完成
+- 📋 **表格**：双击单元格编辑；拖动手柄排序；左右箭头调整层级；支持复制 / 粘贴 / 删除
+- 🗂️ **看板**：拖拽卡片切换状态；进行中可调进度并单独完成；逾期可延期
 
-### 资源分配
+### 👥 资源
 
-- 为每个任务分配负责人和资源组
-- 在资源视图中查看团队成员的工作负载
-- 避免资源冲突和过度分配
+在「资源」页创建资源组与资源，再在表格或看板中为任务分配资源组。
 
-## 🛠️ 开发计划
+示例数据见 [`demo/example_project.json`](demo/example_project.json)。
 
-- [ ] 项目导入/导出功能
-- [ ] 团队协作和云同步
-- [ ] 报表和数据分析
-- [ ] 移动端适配
-- [ ] 插件系统
+## 🗺️ 开发计划
 
-## 🤝 贡献指南
+- [ ] 项目导入 / 导出增强
+- [ ] 报表与数据分析
+- [ ] 协作与同步
 
-欢迎提交 Issue 和 Pull Request！
+## 🤝 贡献
 
-1. Fork 本仓库
-2. 创建你的特性分支 (`git checkout -b feature/AmazingFeature`)
-3. 提交你的修改 (`git commit -m 'Add some AmazingFeature'`)
-4. 推送到分支 (`git push origin feature/AmazingFeature`)
-5. 打开一个 Pull Request
+欢迎 Issue 与 Pull Request。
 
 ## 📄 许可证
 
-本项目基于 [LGPL-2.1](LICENSE) 许可证开源。
+本项目基于 [MIT](LICENSE) 许可证开源。
 
-## 🙏 赞助支持
+Copyright (c) 2026 secretqsan
 
-如果你喜欢这个项目，可以考虑赞助支持开发者，让项目能够持续维护和改进。
-
-## 📧 联系我们
+## 📧 联系
 
 - GitHub: [@secretqsan](https://github.com/secretqsan)
-
-***
-
-© 2024 Projects. All rights reserved.

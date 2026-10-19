@@ -4,7 +4,7 @@ import LanguageSettings from './settings/LanguageSettings.vue'
 import AboutCard from './settings/AboutCard.vue'
 import SponsorCard from './settings/SponsorCard.vue'
 
-const appVersion = '1.0.0'
+const appVersion = '0.1.0'
 </script>
 
 <template>

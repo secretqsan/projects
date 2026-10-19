@@ -5,9 +5,11 @@ import LogoUrl from '../../assets/logo.svg'
 defineProps({
   appVersion: {
     type: String,
-    default: '1.0.0'
+    default: '0.1.0'
   }
 })
+
+const githubUrl = 'https://github.com/secretqsan'
 </script>
 
 <template>
@@ -26,11 +28,28 @@ defineProps({
       <div class="grid grid-cols-2 gap-4 text-sm">
         <div>
           <span class="text-(--text-secondary)">{{ $t('about.developer') }}</span>
-          <p class="text-(--text-primary) font-medium mt-0.5">Your Name</p>
+          <p class="text-(--text-primary) font-medium mt-0.5">{{ $t('about.developerName') }}</p>
         </div>
         <div>
           <span class="text-(--text-secondary)">{{ $t('about.license') }}</span>
-          <p class="text-(--text-primary) font-medium mt-0.5">LGPL</p>
+          <p class="text-(--text-primary) font-medium mt-0.5">{{ $t('about.licenseName') }}</p>
+        </div>
+        <div>
+          <span class="text-(--text-secondary)">{{ $t('about.homepage') }}</span>
+          <a
+            :href="githubUrl"
+            target="_blank"
+            rel="noopener noreferrer"
+            class="block mt-0.5 text-(--accent-color) font-medium hover:underline"
+          >
+            github.com/secretqsan
+          </a>
+        </div>
+        <div>
+          <span class="text-(--text-secondary)">{{ $t('about.techStack') }}</span>
+          <p class="text-(--text-primary) font-medium mt-0.5 text-xs leading-5">
+            {{ $t('about.techStackValue') }}
+          </p>
         </div>
       </div>
     </div>

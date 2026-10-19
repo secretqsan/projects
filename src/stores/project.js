@@ -2,6 +2,7 @@ import { defineStore } from 'pinia'
 import { ref, computed } from 'vue'
 import { invoke } from '@tauri-apps/api/core'
 import { todayISO, isValidISODate, diffISODays } from '../utils/date'
+import { nextCopyFilePath } from '../utils/file'
 import { collectDescendants, directChildren, parseDependencies, taskLevel } from '../components/gantt/utils/taskUtils'
 
 export const useProjectStore = defineStore('project', () => {
@@ -31,7 +32,7 @@ export const useProjectStore = defineStore('project', () => {
     return project
   }
 
-  function copyProject(projectId) {
+  async function copyProject(projectId) {
     const original = projects.value.find(p => p.meta?.id === projectId)
     if (!original) return null
 
@@ -44,6 +45,19 @@ export const useProjectStore = defineStore('project', () => {
       data: original.data
         ? JSON.parse(JSON.stringify(original.data))
         : { tasks: [], resource_groups: [] }
+    }
+
+    if (original.filename) {
+      try {
+        copied.filename = await nextCopyFilePath(original.filename)
+        await invoke('write_file', {
+          path: copied.filename,
+          content: JSON.stringify({ meta: copied.meta, data: copied.data }, null, 2)
+        })
+      } catch (error) {
+        console.error('复制项目文件失败:', error)
+        return null
+      }
     }
 
     projects.value.push(copied)
