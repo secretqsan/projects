@@ -6,7 +6,7 @@ import {
   offsetToISODate
 } from './utils/timeScale.js'
 import { addISODays, diffISODays } from '../../utils/date.js'
-import { parseDependencies, buildChildrenSet, isParentTask } from './utils/taskUtils.js'
+import { parseDependencies, buildChildrenSet } from './utils/taskUtils.js'
 import { calculateDependencyPath } from './utils/bezier.js'
 import { hideHoverTip } from '../../utils/hoverTip'
 
@@ -185,9 +185,9 @@ function onConnectionClick(line) {
 function deleteSelectedConnection() {
   if (!selectedConnection.value) return false
   const { fromTaskId, toTaskId } = selectedConnection.value.line
-  emit('update:tasks', props.tasks.map(t => {
-    if (t.id !== toTaskId) return t
-    return { ...t, dependencies: parseDependencies(t.dependencies).filter(id => id !== fromTaskId) }
+  emit('update:tasks', props.tasks.map(task => {
+    if (task.id !== toTaskId) return task
+    return { ...task, dependencies: parseDependencies(task.dependencies).filter(id => id !== fromTaskId) }
   }))
   selectedConnection.value = null
   emit('connection-selected', null)
@@ -198,7 +198,7 @@ defineExpose({ deleteSelectedConnection })
 
 function addDependency(fromTaskId, toTaskId) {
   const target = props.tasks.find(task => task.id === toTaskId)
-  if (!target || isParentTask(props.tasks, target)) return
+  if (!target) return
   emit('update:tasks', props.tasks.map(t => {
     if (t.id !== toTaskId) return t
     const deps = parseDependencies(t.dependencies)
@@ -317,6 +317,8 @@ function onMouseUp(e) {
       :center-x="centerX"
       :initial-left-offset="leftOffset"
       :initial-right-offset="rightOffset"
+      :center-date="centerDate"
+      :pixels-per-day="pixelsPerDay"
       :has-children="hasChildren"
       :all-tasks="tasks"
       @select="onTaskSelect"

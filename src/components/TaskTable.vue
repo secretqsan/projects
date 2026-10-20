@@ -219,12 +219,12 @@ function columnOptions(col) {
 }
 
 function isLockedCell(task, col) {
-  return Boolean(task && col && childrenSet.value.has(task.id) && (col.key === 'status' || col.key === 'dependencies'))
+  return Boolean(task && col && childrenSet.value.has(task.id) && col.key === 'status')
 }
 
 function cellTip(task, col) {
   if (isLockedCell(task, col)) {
-    return col.key === 'status' ? t('table.statusLocked') : t('table.depsLocked')
+    return t('table.statusLocked')
   }
   if (!task || !col || col.isDragHandle) return ''
   if (col.type === 'select') {
@@ -751,7 +751,6 @@ function toggleOption(option) {
 }
 
 function removeTag(task, key, tag) {
-  if (childrenSet.value.has(task.id) && key === 'dependencies') return
   const originalTask = find(allTasks.value, { id: task.id })
   if (!originalTask) return
 

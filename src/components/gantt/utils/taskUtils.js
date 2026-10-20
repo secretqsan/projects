@@ -32,6 +32,37 @@ export function isParentTask(tasks, task) {
   return index !== -1 && directChildren(tasks, index).length > 0
 }
 
+export function ancestorTasks(tasks, index) {
+  const ancestors = []
+  let level = taskLevel(tasks[index])
+  for (let i = index - 1; i >= 0 && level > 0; i--) {
+    const itemLevel = taskLevel(tasks[i])
+    if (itemLevel < level) {
+      ancestors.push(tasks[i])
+      level = itemLevel
+    }
+  }
+  return ancestors
+}
+
+export function effectiveDependencies(tasks, task) {
+  const index = tasks.findIndex(item => item.id === task?.id)
+  if (index === -1) return parseDependencies(task?.dependencies)
+  const blocked = new Set([task.id, ...collectDescendants(tasks, index).map(item => item.id)])
+  const seen = new Set()
+  const ids = []
+  const chain = [...ancestorTasks(tasks, index)].reverse()
+  chain.push(tasks[index])
+  for (const item of chain) {
+    for (const id of parseDependencies(item.dependencies)) {
+      if (blocked.has(id) || seen.has(id)) continue
+      seen.add(id)
+      ids.push(id)
+    }
+  }
+  return ids
+}
+
 export function statusFromChildren(children) {
   const statuses = children.map(child => child.status || 'pending')
   if (statuses.every(status => status === 'completed')) return 'completed'
@@ -77,7 +108,7 @@ export function buildChildrenSet(tasks) {
 }
 
 export function areDependenciesCompleted(task, allTasks) {
-  const deps = parseDependencies(task.dependencies)
+  const deps = effectiveDependencies(allTasks, task)
   if (!deps.length) return true
 
   const taskMap = keyBy(allTasks, 'id')

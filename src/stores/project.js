@@ -143,10 +143,6 @@ export const useProjectStore = defineStore('project', () => {
         delete task.actual_end_date
         changed = true
       }
-      if (parseDependencies(task.dependencies).length) {
-        task.dependencies = []
-        changed = true
-      }
     }
     return changed
   }

@@ -2,6 +2,7 @@
 import { ref, computed, watch } from 'vue'
 import { useI18n } from 'vue-i18n'
 import { useEventListener, useTimeoutFn } from '@vueuse/core'
+import { snapOffsetToDay } from './utils/timeScale.js'
 import { taskStatusColor } from './utils/taskUtils.js'
 import { showHoverTip, hideHoverTip } from '../../utils/hoverTip'
 
@@ -33,6 +34,14 @@ const props = defineProps({
   initialRightOffset: {
     type: Number,
     default: 60
+  },
+  centerDate: {
+    type: Date,
+    required: true
+  },
+  pixelsPerDay: {
+    type: Number,
+    required: true
   },
   hasChildren: {
     type: Boolean,
@@ -148,6 +157,13 @@ function onPointMouseUp(e, point) {
 const POINTER_THRESHOLD = 4
 let resizeOriginX = 0
 let resizeDragged = false
+let rawLeft = 0
+let rawRight = 0
+let moveDurationDays = 1
+
+function snapOffset(offset) {
+  return snapOffsetToDay(offset, props.centerDate, props.pixelsPerDay)
+}
 
 function onResizeStart(e, direction) {
   e.stopPropagation()
@@ -157,6 +173,8 @@ function onResizeStart(e, direction) {
   resizeDirection.value = direction
   resizeOriginX = e.clientX
   resizeStartX.value = e.clientX
+  rawLeft = leftOffset.value
+  rawRight = rightOffset.value
 }
 
 function onResizeMove(e) {
@@ -166,12 +184,14 @@ function onResizeMove(e) {
 
   const deltaX = e.clientX - resizeStartX.value
   resizeStartX.value = e.clientX
+  const minWidth = props.pixelsPerDay || 20
 
-  const minWidth = 20
   if (resizeDirection.value === 'left') {
-    leftOffset.value = Math.min(leftOffset.value + deltaX, rightOffset.value - minWidth)
+    rawLeft += deltaX
+    leftOffset.value = Math.min(snapOffset(rawLeft), rightOffset.value - minWidth)
   } else {
-    rightOffset.value = Math.max(rightOffset.value + deltaX, leftOffset.value + minWidth)
+    rawRight += deltaX
+    rightOffset.value = Math.max(snapOffset(rawRight), leftOffset.value + minWidth)
   }
 
   emit('resize', {
@@ -211,6 +231,8 @@ function onTaskMouseDown(e) {
   moveDragged = false
   moveOriginX = e.clientX
   moveStartX.value = e.clientX
+  rawLeft = leftOffset.value
+  rawRight = rightOffset.value
 }
 
 function onTaskMove(e) {
@@ -219,12 +241,13 @@ function onTaskMove(e) {
   if (!moveDragged) {
     moveDragged = true
     isMoving.value = true
+    moveDurationDays = Math.max(1, Math.round((rawRight - rawLeft) / props.pixelsPerDay))
   }
 
-  const deltaX = e.clientX - moveStartX.value
+  rawLeft += e.clientX - moveStartX.value
   moveStartX.value = e.clientX
-  leftOffset.value += deltaX
-  rightOffset.value += deltaX
+  leftOffset.value = snapOffset(rawLeft)
+  rightOffset.value = leftOffset.value + moveDurationDays * props.pixelsPerDay
 
   emit('move', {
     task: props.task,

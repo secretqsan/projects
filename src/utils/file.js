@@ -1,6 +1,6 @@
-import { basename, dirname, extname, join } from '@tauri-apps/api/path'
+import { appDataDir, basename, dirname, extname, join, resolveResource } from '@tauri-apps/api/path'
 import { open, save } from '@tauri-apps/plugin-dialog'
-import { exists, readTextFile, writeTextFile } from '@tauri-apps/plugin-fs'
+import { exists, mkdir, readTextFile, writeTextFile } from '@tauri-apps/plugin-fs'
 import i18n from '../i18n'
 import { createId } from './id'
 
@@ -72,6 +72,27 @@ function isValidProject(project) {
     && typeof project === 'object'
     && project.meta && typeof project.meta === 'object'
     && project.data && typeof project.data === 'object'
+}
+
+const EXAMPLE_RESOURCE = '../demo/example_project.json'
+
+export async function ensureExampleProject() {
+  if (!window.__TAURI_INTERNALS__) return null
+  try {
+    const dir = await appDataDir()
+    if (!(await exists(dir))) {
+      await mkdir(dir, { recursive: true })
+    }
+    const target = await join(dir, 'example_project.json')
+    if (!(await exists(target))) {
+      const bundled = await resolveResource(EXAMPLE_RESOURCE)
+      await writeTextFile(target, await readTextFile(bundled))
+    }
+    return target
+  } catch (error) {
+    console.error('准备示例项目失败:', error)
+    return null
+  }
 }
 
 export async function openProject(filename, configStore, projectStore) {

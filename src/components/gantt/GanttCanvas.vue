@@ -4,7 +4,7 @@ import { useEventListener, useRafFn, useResizeObserver, useTimeoutFn } from '@vu
 import { getPixelsPerDay, addDays, MS_PER_DAY } from './utils/timeScale.js'
 import { getVisibleRowRange } from './utils/taskUtils.js'
 import { computeYearIndicators } from './utils/virtualIndicators.js'
-import { todayISO, formatDateShort } from '../../utils/date.js'
+import { formatDateShort, localDay } from '../../utils/date.js'
 
 const props = defineProps({
   timeSpan: { type: Number, required: true },
@@ -33,13 +33,13 @@ const totalHeight = computed(() => Math.max(props.taskCount, 1) * props.rowHeigh
 
 // 刻度锚定在日期上（与任务条带同一套数学）：先确定覆盖视口的刻度日期，
 // 再由日期推导像素位置。平移提交换算 centerDate 后，每个刻度日期对应的像素位置完全连续。
-const TICK_EPOCH_MS = new Date('2000-01-01').getTime()
+const TICK_EPOCH_MS = new Date(2000, 0, 1).getTime()
 
 const renderIndicators = computed(() => {
-  const count = Math.min(props.timeSpan, MAX_TICK_COUNT)
   const ppd = pixelsPerDay.value
   const centerX = visibleWidth.value / 2
-  const intervalMs = (props.timeSpan / count) * MS_PER_DAY
+  const intervalDays = Math.max(1, Math.ceil(props.timeSpan / MAX_TICK_COUNT))
+  const intervalMs = intervalDays * MS_PER_DAY
   const centerMs = props.centerDate.getTime()
 
   const leftMs = centerMs - ((centerX + dragOffsetX.value) / ppd) * MS_PER_DAY
@@ -60,7 +60,7 @@ const renderIndicators = computed(() => {
 })
 const yearIndicators = computed(() => computeYearIndicators(renderIndicators.value, visibleWidth.value))
 
-const todayMs = ref(Date.parse(todayISO()))
+const todayMs = ref(localDay(new Date()).getTime())
 const todayBand = computed(() => {
   const ppd = pixelsPerDay.value
   if (!ppd) return null
@@ -222,7 +222,7 @@ function scheduleTodayRefresh() {
   const now = new Date()
   const nextMidnight = new Date(now.getFullYear(), now.getMonth(), now.getDate() + 1)
   todayTimer = setTimeout(() => {
-    todayMs.value = Date.parse(todayISO())
+    todayMs.value = localDay(new Date()).getTime()
     scheduleTodayRefresh()
   }, nextMidnight.getTime() - now.getTime() + 50)
 }

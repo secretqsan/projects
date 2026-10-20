@@ -11,15 +11,15 @@
         "id": "plan",
         "name": "立项与范围",
         "start_date": "2026-09-07",
-        "end_date": "2026-09-19",
-        "duration": 12,
+        "end_date": "2026-09-18",
+        "duration": 11,
         "status": "completed",
         "progress": 100,
         "level": 0,
         "resource_groups": ["pm"],
         "dependencies": [],
         "actual_start_date": "2026-09-07",
-        "actual_end_date": "2026-09-19"
+        "actual_end_date": "2026-09-18"
       },
       {
         "id": "plan-kick",
@@ -33,33 +33,35 @@
         "resource_groups": ["pm"],
         "dependencies": [],
         "actual_start_date": "2026-09-07",
-        "actual_end_date": "2026-09-08"
+        "actual_end_date": "2026-09-09",
+        "assigned_resources": { "pm": "陈晓" }
       },
       {
         "id": "plan-scope",
         "name": "范围说明",
-        "start_date": "2026-09-09",
-        "end_date": "2026-09-19",
-        "duration": 10,
+        "start_date": "2026-09-10",
+        "end_date": "2026-09-18",
+        "duration": 8,
         "status": "completed",
         "progress": 100,
         "level": 1,
         "resource_groups": ["pm", "design"],
         "dependencies": ["plan-kick"],
-        "actual_start_date": "2026-09-09",
-        "actual_end_date": "2026-09-18"
+        "actual_start_date": "2026-09-10",
+        "actual_end_date": "2026-09-17",
+        "assigned_resources": { "pm": "陈晓", "design": "林可" }
       },
       {
         "id": "design",
         "name": "产品设计",
         "start_date": "2026-09-21",
-        "end_date": "2026-10-22",
-        "duration": 31,
+        "end_date": "2026-10-24",
+        "duration": 33,
         "status": "overdue",
         "progress": 0,
         "level": 0,
         "resource_groups": ["design"],
-        "dependencies": []
+        "dependencies": ["plan"]
       },
       {
         "id": "design-ia",
@@ -71,7 +73,7 @@
         "progress": 100,
         "level": 1,
         "resource_groups": ["design"],
-        "dependencies": ["plan"],
+        "dependencies": [],
         "actual_start_date": "2026-09-21",
         "actual_end_date": "2026-09-29",
         "assigned_resources": { "design": "周宁" }
@@ -79,9 +81,9 @@
       {
         "id": "design-review",
         "name": "设计评审",
-        "start_date": "2026-10-07",
-        "end_date": "2026-10-14",
-        "duration": 7,
+        "start_date": "2026-10-08",
+        "end_date": "2026-10-16",
+        "duration": 8,
         "status": "overdue",
         "progress": 40,
         "level": 1,
@@ -93,42 +95,42 @@
       {
         "id": "design-ui",
         "name": "界面设计",
-        "start_date": "2026-10-07",
-        "end_date": "2026-10-22",
-        "duration": 15,
+        "start_date": "2026-10-06",
+        "end_date": "2026-10-24",
+        "duration": 18,
         "status": "in_progress",
         "progress": 0,
         "level": 1,
         "resource_groups": ["design"],
-        "dependencies": []
+        "dependencies": ["design-ia"]
       },
       {
         "id": "design-home",
         "name": "首页",
-        "start_date": "2026-10-07",
-        "end_date": "2026-10-13",
+        "start_date": "2026-10-06",
+        "end_date": "2026-10-12",
         "duration": 6,
         "status": "completed",
         "progress": 100,
         "level": 2,
         "resource_groups": ["design"],
-        "dependencies": ["design-ia"],
-        "actual_start_date": "2026-10-07",
-        "actual_end_date": "2026-10-13",
+        "dependencies": [],
+        "actual_start_date": "2026-10-06",
+        "actual_end_date": "2026-10-12",
         "assigned_resources": { "design": "林可" }
       },
       {
         "id": "design-order",
         "name": "下单页",
-        "start_date": "2026-10-14",
-        "end_date": "2026-10-22",
-        "duration": 8,
+        "start_date": "2026-10-13",
+        "end_date": "2026-10-24",
+        "duration": 11,
         "status": "in_progress",
         "progress": 55,
         "level": 2,
         "resource_groups": ["design"],
         "dependencies": ["design-home"],
-        "actual_start_date": "2026-10-15",
+        "actual_start_date": "2026-10-13",
         "assigned_resources": { "design": "周宁" }
       },
       {
@@ -141,7 +143,20 @@
         "progress": 0,
         "level": 0,
         "resource_groups": ["dev"],
-        "dependencies": []
+        "dependencies": ["design"]
+      },
+      {
+        "id": "build-api",
+        "name": "订单接口",
+        "start_date": "2026-10-26",
+        "end_date": "2026-11-06",
+        "duration": 11,
+        "status": "pending",
+        "progress": 0,
+        "level": 1,
+        "resource_groups": ["dev"],
+        "dependencies": [],
+        "assigned_resources": { "dev": "苏衡" }
       },
       {
         "id": "build-app",
@@ -153,19 +168,8 @@
         "progress": 0,
         "level": 1,
         "resource_groups": ["dev"],
-        "dependencies": ["design"]
-      },
-      {
-        "id": "build-api",
-        "name": "订单接口",
-        "start_date": "2026-10-26",
-        "end_date": "2026-11-04",
-        "duration": 9,
-        "status": "pending",
-        "progress": 0,
-        "level": 1,
-        "resource_groups": ["dev"],
-        "dependencies": ["design"]
+        "dependencies": [],
+        "assigned_resources": { "dev": "马岚" }
       },
       {
         "id": "release",
@@ -177,31 +181,46 @@
         "progress": 0,
         "level": 0,
         "resource_groups": ["qa", "pm"],
-        "dependencies": []
+        "dependencies": ["build"]
       },
       {
         "id": "release-qa",
         "name": "联调验收",
         "start_date": "2026-11-16",
-        "end_date": "2026-11-20",
-        "duration": 4,
+        "end_date": "2026-11-19",
+        "duration": 3,
         "status": "pending",
         "progress": 0,
         "level": 1,
         "resource_groups": ["qa"],
-        "dependencies": ["build"]
+        "dependencies": [],
+        "assigned_resources": { "qa": "何清" }
+      },
+      {
+        "id": "release-ship",
+        "name": "发布上线",
+        "start_date": "2026-11-19",
+        "end_date": "2026-11-20",
+        "duration": 1,
+        "status": "pending",
+        "progress": 0,
+        "level": 1,
+        "resource_groups": ["pm"],
+        "dependencies": ["release-qa"],
+        "assigned_resources": { "pm": "陈晓" }
       },
       {
         "id": "feedback",
         "name": "用户反馈调研",
-        "start_date": "2026-11-22",
-        "end_date": "2026-12-07",
-        "duration": 15,
+        "start_date": "2026-11-23",
+        "end_date": "2026-12-04",
+        "duration": 11,
         "status": "pending",
         "progress": 0,
         "level": 0,
         "resource_groups": ["pm"],
-        "dependencies": ["release"]
+        "dependencies": ["release"],
+        "assigned_resources": { "pm": "陈晓" }
       }
     ],
     "resource_groups": [
@@ -210,7 +229,9 @@
         "name": "项目管理",
         "type": "human",
         "exclusive": false,
-        "resources": [{ "id": "res-chen", "name": "陈晓" }]
+        "resources": [
+          { "id": "res-chen", "name": "陈晓" }
+        ]
       },
       {
         "id": "design",
@@ -237,7 +258,9 @@
         "name": "测试",
         "type": "human",
         "exclusive": false,
-        "resources": [{ "id": "res-he", "name": "何清" }]
+        "resources": [
+          { "id": "res-he", "name": "何清" }
+        ]
       }
     ]
   }

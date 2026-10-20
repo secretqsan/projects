@@ -1,5 +1,6 @@
 <script setup>
 import { ref } from 'vue'
+import { localDay } from '../../utils/date.js'
 import GanttCanvas from './GanttCanvas.vue'
 import GanttTaskBars from './GanttTaskBars.vue'
 
@@ -13,8 +14,7 @@ const props = defineProps({
 const emit = defineEmits(['update:tasks', 'selection-changed', 'connection-selected'])
 
 const ganttTaskBarsRef = ref(null)
-const today = new Date()
-const centerDate = ref(new Date(today.getFullYear(), today.getMonth(), today.getDate()))
+const centerDate = ref(localDay(new Date()))
 
 function deleteSelectedConnection() {
   return ganttTaskBarsRef.value?.deleteSelectedConnection?.() || false
