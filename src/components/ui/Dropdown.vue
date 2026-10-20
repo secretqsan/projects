@@ -1,5 +1,7 @@
 <script setup>
-import { ref, computed, watch, nextTick, onMounted, onUnmounted } from 'vue'
+import { ref, computed } from 'vue'
+import { autoUpdate, flip, offset, shift, size, useFloating } from '@floating-ui/vue'
+import { onClickOutside } from '@vueuse/core'
 
 const props = defineProps({
   modelValue: {
@@ -12,7 +14,7 @@ const props = defineProps({
   },
   placeholder: {
     type: String,
-    default: '请选择'
+    default: ''
   },
   optionKey: {
     type: String,
@@ -33,11 +35,34 @@ const emit = defineEmits(['update:modelValue', 'change'])
 const isOpen = ref(false)
 const dropdownRef = ref(null)
 const dropdownMenuRef = ref(null)
-const dropdownStyle = ref({})
 
 const selectedOption = computed(() =>
   props.options.find(opt => opt[props.optionKey] === props.modelValue)
 )
+
+const { floatingStyles, isPositioned } = useFloating(dropdownRef, dropdownMenuRef, {
+  strategy: 'absolute',
+  placement: 'bottom-start',
+  transform: false,
+  open: isOpen,
+  whileElementsMounted: (reference, floating, update) => autoUpdate(reference, floating, update, {
+    ancestorScroll: false
+  }),
+  middleware: [
+    offset(4),
+    flip(),
+    shift({ padding: 8 }),
+    size({
+      apply({ rects, elements }) {
+        Object.assign(elements.floating.style, {
+          width: `${rects.reference.width}px`,
+          maxHeight: '300px',
+          overflowY: 'auto'
+        })
+      }
+    })
+  ]
+})
 
 function toggleDropdown() {
   isOpen.value = !isOpen.value
@@ -50,73 +75,15 @@ function selectOption(option) {
   isOpen.value = false
 }
 
-function handleClickOutside(event) {
-  if (dropdownRef.value && !dropdownRef.value.contains(event.target) &&
-      dropdownMenuRef.value && !dropdownMenuRef.value.contains(event.target)) {
-    isOpen.value = false
-  }
-}
-
-// 计算下拉菜单位置，下方空间不足且上方空间足够时向上展开
-async function updateDropdownPosition() {
-  if (!isOpen.value || !dropdownRef.value) return
-
-  await nextTick()
-
-  const triggerRect = dropdownRef.value.getBoundingClientRect()
-  const menuHeight = dropdownMenuRef.value?.offsetHeight || 200
-
-  const spaceBelow = window.innerHeight - triggerRect.bottom
-  const spaceAbove = triggerRect.top
-
-  let top = triggerRect.bottom + 4
-  if (spaceBelow < menuHeight && spaceAbove > menuHeight) {
-    top = triggerRect.top - menuHeight - 4
-  }
-
-  dropdownStyle.value = {
-    top: `${top}px`,
-    left: `${triggerRect.left}px`,
-    width: `${triggerRect.width}px`,
-    maxHeight: '300px',
-    overflowY: 'auto'
-  }
-}
-
-function handleResize() {
-  if (isOpen.value) {
-    updateDropdownPosition()
-  }
-}
-
-function handleScroll() {
-  if (isOpen.value) {
-    isOpen.value = false
-  }
-}
-
-watch(isOpen, (open) => {
-  if (open) {
-    updateDropdownPosition()
-  }
-})
-
-onMounted(() => {
-  document.addEventListener('click', handleClickOutside)
-  window.addEventListener('resize', handleResize)
-  window.addEventListener('scroll', handleScroll, true)
-})
-
-onUnmounted(() => {
-  document.removeEventListener('click', handleClickOutside)
-  window.removeEventListener('resize', handleResize)
-  window.removeEventListener('scroll', handleScroll, true)
+onClickOutside(dropdownRef, () => {
+  isOpen.value = false
+}, {
+  ignore: [dropdownMenuRef]
 })
 </script>
 
 <template>
   <div ref="dropdownRef" class="relative">
-    <!-- 触发按钮 -->
     <button
       class="w-full flex items-center justify-between px-4 py-2.5 bg-[var(--bg-card)] border border-[var(--border-color)] rounded-lg text-[var(--text-primary)] hover:bg-[var(--bg-secondary)] transition-colors"
       @click.stop="toggleDropdown"
@@ -135,22 +102,20 @@ onUnmounted(() => {
       ></i>
     </button>
 
-    <!-- 下拉选项 - 使用 fixed 定位避免被父组件遮挡 -->
-    <Teleport to="body">
-      <Transition
-        enter-active-class="transition ease-out duration-100"
-        enter-from-class="transform opacity-0 scale-95"
-        enter-to-class="transform opacity-100 scale-100"
-        leave-active-class="transition ease-in duration-75"
-        leave-from-class="transform opacity-100 scale-100"
-        leave-to-class="transform opacity-0 scale-95"
+    <Transition
+      enter-active-class="transition-opacity ease-out duration-100"
+      enter-from-class="opacity-0"
+      enter-to-class="opacity-100"
+      leave-active-class="transition-opacity ease-in duration-75"
+      leave-from-class="opacity-100"
+      leave-to-class="opacity-0"
+    >
+      <div
+        v-if="isOpen"
+        ref="dropdownMenuRef"
+        class="absolute z-20 bg-[var(--bg-card)] border border-[var(--border-color)] rounded-lg shadow-lg overflow-hidden"
+        :style="{ ...floatingStyles, visibility: isPositioned ? 'visible' : 'hidden' }"
       >
-        <div
-          v-if="isOpen"
-          ref="dropdownMenuRef"
-          class="fixed bg-[var(--bg-card)] border border-[var(--border-color)] rounded-lg shadow-lg overflow-hidden z-[9999]"
-          :style="dropdownStyle"
-        >
           <button
             v-for="option in options"
             :key="option[optionKey]"
@@ -165,8 +130,7 @@ onUnmounted(() => {
               class="pi pi-check text-xs ml-auto text-[var(--accent-color)]"
             ></i>
           </button>
-        </div>
-      </Transition>
-    </Teleport>
+      </div>
+    </Transition>
   </div>
 </template>

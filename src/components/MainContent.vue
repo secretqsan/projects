@@ -1,5 +1,6 @@
 <script setup>
-import { ref, watch } from 'vue'
+import { computed, ref, watch } from 'vue'
+import { useI18n } from 'vue-i18n'
 import { useRuntimeStateStore } from '../stores/runtimeState'
 import { useProjectStore } from '../stores/project'
 import Settings from './SettingsView.vue'
@@ -8,6 +9,7 @@ import GanttChart from './gantt/GanttChart.vue'
 import Kanban from './KanbanView.vue'
 import Resources from './ResourcesView.vue'
 
+const { t } = useI18n()
 const runtimeState = useRuntimeStateStore()
 const projectStore = useProjectStore()
 
@@ -17,11 +19,11 @@ watch(() => runtimeState.focusedTaskId, (taskId) => {
   if (taskId) activeView.value = 'gantt'
 })
 
-const views = [
-  { id: 'gantt', label: '甘特图', icon: 'pi pi-calendar' },
-  { id: 'kanban', label: '看板', icon: 'pi pi-th-large' },
-  { id: 'resources', label: '资源', icon: 'pi pi-users' },
-]
+const views = computed(() => [
+  { id: 'gantt', label: t('views.gantt'), icon: 'pi pi-calendar' },
+  { id: 'kanban', label: t('views.kanban'), icon: 'pi pi-th-large' },
+  { id: 'resources', label: t('views.resources'), icon: 'pi pi-users' },
+])
 </script>
 
 <template>

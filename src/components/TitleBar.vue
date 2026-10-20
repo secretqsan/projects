@@ -1,8 +1,10 @@
 <script setup>
 import { ref, computed } from 'vue'
+import { useTimeoutFn } from '@vueuse/core'
 import { getCurrentWindow } from '@tauri-apps/api/window'
 import { useProjectStore } from '../stores/project'
 import { useRuntimeStateStore } from '../stores/runtimeState'
+import { taskStatusColor } from './gantt/utils/taskUtils.js'
 
 const projectStore = useProjectStore()
 const runtimeState = useRuntimeStateStore()
@@ -52,11 +54,12 @@ function selectTask(task) {
   isSearchFocused.value = false
 }
 
+const { start: hideSearchResults } = useTimeoutFn(() => {
+  isSearchFocused.value = false
+}, 200, { immediate: false })
+
 function onSearchBlur() {
-  // 延迟隐藏，让点击事件先触发
-  setTimeout(() => {
-    isSearchFocused.value = false
-  }, 200)
+  hideSearchResults()
 }
 </script>
 
@@ -84,7 +87,7 @@ function onSearchBlur() {
         <input
           v-model="searchQuery"
           type="text"
-          placeholder="搜索任务..."
+          :placeholder="$t('search.placeholder')"
           class="w-full h-7 pl-8 pr-3 text-[13px] text-(--text-primary) bg-(--bg-card) border border-(--border-color) rounded-md outline-none transition-all duration-200 placeholder:text-(--text-muted) hover:border-(--text-secondary) focus:border-(--accent-color) focus:ring-2 focus:ring-[var(--accent-color)]/20"
           @focus="isSearchFocused = true"
           @blur="onSearchBlur"
@@ -106,7 +109,7 @@ function onSearchBlur() {
               <div class="flex items-center gap-2 min-w-0 flex-1">
                 <div
                   class="w-2 h-2 rounded-full shrink-0"
-                  :style="{ backgroundColor: task.color || '#3b82f6' }"
+                  :style="{ backgroundColor: taskStatusColor(task, projectStore.currentProject?.data?.tasks || []) }"
                 ></div>
                 <span class="text-[13px] text-(--text-primary) truncate">
                   {{ task.name }}
@@ -120,7 +123,7 @@ function onSearchBlur() {
             v-else
             class="px-3 py-4 text-center text-[13px] text-(--text-muted)"
           >
-            未找到匹配的任务
+            {{ $t('search.empty') }}
           </div>
         </div>
       </div>

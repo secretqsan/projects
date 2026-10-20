@@ -1,16 +1,21 @@
 import { defineStore } from 'pinia'
 import { ref, computed } from 'vue'
-import { invoke } from '@tauri-apps/api/core'
-import { todayISO, isValidISODate, diffISODays } from '../utils/date'
-import { nextCopyFilePath } from '../utils/file'
-import { collectDescendants, directChildren, parseDependencies, taskLevel } from '../components/gantt/utils/taskUtils'
+import cloneDeep from 'lodash/cloneDeep'
+import find from 'lodash/find'
+import get from 'lodash/get'
+import remove from 'lodash/remove'
+import { todayISO, isValidISODate, addISODays, diffISODays } from '../utils/date'
+import { nextCopyFilePath, writeProjectFile } from '../utils/file'
+import { createId } from '../utils/id'
+import i18n from '../i18n'
+import { areDependenciesCompleted, collectDescendants, directChildren, isParentTask, parseDependencies, statusFromChildren, taskLevel } from '../components/gantt/utils/taskUtils'
 
 export const useProjectStore = defineStore('project', () => {
   const currentProject = ref(null)
   const projects = ref([])
 
   const currentResourceGroups = computed(() =>
-    currentProject.value?.data?.resource_groups || []
+    get(currentProject.value, 'data.resource_groups', [])
   )
 
   function setCurrentProject(project) {
@@ -33,27 +38,27 @@ export const useProjectStore = defineStore('project', () => {
   }
 
   async function copyProject(projectId) {
-    const original = projects.value.find(p => p.meta?.id === projectId)
+    const original = find(projects.value, p => p.meta?.id === projectId)
     if (!original) return null
 
     const copied = {
       meta: {
         ...original.meta,
-        id: `project_${Date.now()}_${Math.random().toString(36).slice(2, 8)}`,
-        name: `${original.meta?.name || '未命名项目'} 副本`
+        id: createId('project'),
+        name: i18n.global.t('project.copyName', { name: get(original, 'meta.name', i18n.global.t('project.unnamed')) })
       },
       data: original.data
-        ? JSON.parse(JSON.stringify(original.data))
+        ? cloneDeep(original.data)
         : { tasks: [], resource_groups: [] }
     }
 
     if (original.filename) {
       try {
         copied.filename = await nextCopyFilePath(original.filename)
-        await invoke('write_file', {
-          path: copied.filename,
-          content: JSON.stringify({ meta: copied.meta, data: copied.data }, null, 2)
-        })
+        await writeProjectFile(
+          copied.filename,
+          JSON.stringify({ meta: copied.meta, data: copied.data }, null, 2)
+        )
       } catch (error) {
         console.error('复制项目文件失败:', error)
         return null
@@ -70,110 +75,155 @@ export const useProjectStore = defineStore('project', () => {
     const data = currentProject.value?.data
     if (!data) return
 
-    if (!data.resource_groups) {
-      data.resource_groups = []
-    }
+    if (!data.resource_groups) data.resource_groups = []
     data.resource_groups.push({
       ...group,
-      id: group.id || `group${Date.now()}`,
+      id: group.id || createId('group'),
       resources: group.resources || []
     })
   }
 
   function updateResourceGroup(groupId, updates) {
-    const group = currentProject.value?.data?.resource_groups?.find(g => g.id === groupId)
-    if (group) {
-      Object.assign(group, updates)
-    }
+    const group = find(get(currentProject.value, 'data.resource_groups'), { id: groupId })
+    if (group) Object.assign(group, updates)
   }
 
   function removeResourceGroup(groupId) {
-    const groups = currentProject.value?.data?.resource_groups
-    const index = groups?.findIndex(g => g.id === groupId)
-    if (index > -1) {
-      groups.splice(index, 1)
-    }
+    const groups = get(currentProject.value, 'data.resource_groups')
+    if (groups) remove(groups, { id: groupId })
   }
 
   function addResource(groupId, resource) {
-    const group = currentProject.value?.data?.resource_groups?.find(g => g.id === groupId)
+    const group = find(get(currentProject.value, 'data.resource_groups'), { id: groupId })
     if (!group) return
 
-    if (!group.resources) {
-      group.resources = []
-    }
+    if (!group.resources) group.resources = []
     group.resources.push({
       ...resource,
-      id: resource.id || `resource${Date.now()}`
+      id: resource.id || createId('resource')
     })
   }
 
   function updateResource(groupId, resourceId, updates) {
-    const resource = currentProject.value?.data?.resource_groups
-      ?.find(g => g.id === groupId)
-      ?.resources?.find(r => r.id === resourceId)
-    if (resource) {
-      Object.assign(resource, updates)
-    }
+    const group = find(get(currentProject.value, 'data.resource_groups'), { id: groupId })
+    const resource = find(group?.resources, { id: resourceId })
+    if (resource) Object.assign(resource, updates)
   }
 
   function removeResource(groupId, resourceId) {
-    const resources = currentProject.value?.data?.resource_groups
-      ?.find(g => g.id === groupId)
-      ?.resources
-    const index = resources?.findIndex(r => r.id === resourceId)
-    if (index > -1) {
-      resources.splice(index, 1)
-    }
+    const group = find(get(currentProject.value, 'data.resource_groups'), { id: groupId })
+    if (group?.resources) remove(group.resources, { id: resourceId })
   }
 
   // ========== 任务层级工具 ==========
 
-  // 进度只由用户指定。父任务仅在直接子任务全部完成时一并完成，不按子任务比例改写进度。
-  function applyParentCompletion(tasks, index) {
-    const children = directChildren(tasks, index)
-    if (children.length === 0) return false
+  // 父任务没有独立状态，由直接子任务汇总；从最深层父任务向上写回。
+  function rollupParentStatuses(tasks) {
+    const today = todayISO()
+    let changed = false
+    for (let i = tasks.length - 1; i >= 0; i--) {
+      const children = directChildren(tasks, i)
+      if (!children.length) continue
+      const task = tasks[i]
+      const next = statusFromChildren(children)
+      if (task.status !== next) {
+        task.status = next
+        changed = true
+      }
+      if (next === 'completed') {
+        if (task.progress !== 100) {
+          task.progress = 100
+          changed = true
+        }
+        if (!task.actual_end_date) {
+          task.actual_end_date = today
+          changed = true
+        }
+      } else if (task.actual_end_date) {
+        delete task.actual_end_date
+        changed = true
+      }
+      if (parseDependencies(task.dependencies).length) {
+        task.dependencies = []
+        changed = true
+      }
+    }
+    return changed
+  }
 
-    const task = tasks[index]
-    if (!children.every(child => child.status === 'completed')) return false
-    if (task.status === 'completed' && task.progress === 100) return false
+  function updateParentTaskStatus() {
+    const tasks = currentProject.value?.data?.tasks
+    if (!tasks?.length) return
+    rollupParentStatuses(tasks)
+  }
 
-    task.status = 'completed'
-    task.progress = 100
-    task.actual_end_date = todayISO()
+  const taskStatuses = ['pending', 'in_progress', 'completed', 'overdue']
+
+  // 叶子任务的日期状态：过期标逾期，已过开始日且依赖完成则自动开始。
+  // 父任务不在这里改，交给 rollup。
+  function syncLeafSchedule(task, tasks, today = todayISO(), relieveOverdue = false) {
+    if (!task || task.status === 'completed') return false
+    const index = tasks.findIndex(item => item.id === task.id)
+    if (index === -1 || directChildren(tasks, index).length > 0) return false
+
+    if (isValidISODate(task.end_date) && task.end_date < today) {
+      if (task.status === 'overdue') return false
+      task.status = 'overdue'
+      return true
+    }
+    if (relieveOverdue && task.status === 'overdue' && isValidISODate(task.end_date) && task.end_date >= today) {
+      task.status = 'in_progress'
+      if (!task.actual_start_date) task.actual_start_date = today
+      return true
+    }
+    if (task.status === 'pending' && isValidISODate(task.start_date) && task.start_date < today && areDependenciesCompleted(task, tasks)) {
+      task.status = 'in_progress'
+      if (!task.actual_start_date) task.actual_start_date = today
+      return true
+    }
+    return false
+  }
+
+  function applyTaskStatus(task, status) {
+    const tasks = currentProject.value?.data?.tasks
+    if (!tasks || !task || !taskStatuses.includes(status) || task.status === status) return false
+    if (isParentTask(tasks, task)) return false
+    if (status === 'in_progress' && !areDependenciesCompleted(task, tasks)) return false
+
+    const previous = task.status
+    task.status = status
+    if (status === 'completed') {
+      task.progress = 100
+      task.actual_end_date = todayISO()
+    } else if (previous === 'completed') {
+      delete task.actual_end_date
+    }
+    if (status === 'in_progress' && !task.actual_start_date) {
+      task.actual_start_date = todayISO()
+    }
+    rollupParentStatuses(tasks)
     return true
   }
 
-  function parentIndexOf(tasks, index) {
-    const level = taskLevel(tasks[index])
-    if (level === 0) return -1
-    for (let i = index - 1; i >= 0; i--) {
-      if (taskLevel(tasks[i]) < level) return i
-    }
-    return -1
+  function postponeTask(task, days) {
+    const tasks = currentProject.value?.data?.tasks
+    const count = Math.trunc(Number(days))
+    if (!tasks || !task?.end_date || count < 1) return false
+
+    const end = addISODays(task.end_date, count)
+    if (!isValidISODate(end)) return false
+    task.end_date = end
+    task.duration = diffISODays(task.start_date, task.end_date)
+    syncLeafSchedule(task, tasks, todayISO(), true)
+    rollupParentStatuses(tasks)
+    return true
   }
 
-  function updateParentTaskStatus(changedTaskId) {
+  function refreshTaskSchedule(task) {
     const tasks = currentProject.value?.data?.tasks
-    if (!tasks?.length || !changedTaskId) return
-
-    let index = tasks.findIndex(task => task.id === changedTaskId)
-    if (index === -1) return
-
-    while (index >= 0) {
-      const parentIndex = parentIndexOf(tasks, index)
-      if (parentIndex === -1) return
-      if (!applyParentCompletion(tasks, parentIndex)) return
-      index = parentIndex
-    }
-  }
-
-  function syncAllParentCompletion() {
-    const tasks = currentProject.value?.data?.tasks
-    if (!tasks) return
-    for (let i = tasks.length - 1; i >= 0; i--) {
-      applyParentCompletion(tasks, i)
-    }
+    if (!tasks || !task) return
+    syncLeafSchedule(task, tasks, todayISO(), true)
+    rollupParentStatuses(tasks)
   }
 
   function updateTasks(newTasks) {
@@ -186,7 +236,7 @@ export const useProjectStore = defineStore('project', () => {
 
   function validateProjectData() {
     const errors = []
-    const tasks = currentProject.value?.data?.tasks || []
+    const tasks = get(currentProject.value, 'data.tasks', [])
 
     if (tasks.length === 0) return { valid: true, errors: [] }
 
@@ -257,12 +307,12 @@ export const useProjectStore = defineStore('project', () => {
 
   // 自动修复项目数据 - 返回修复后的任务数组和修复日志
   function autoFixProjectData() {
-    const tasks = currentProject.value?.data?.tasks || []
+    const tasks = get(currentProject.value, 'data.tasks', [])
     const fixes = []
 
     if (tasks.length === 0) return { fixedTasks: tasks, fixes }
 
-    const fixedTasks = tasks.map(t => ({ ...t }))
+    const fixedTasks = cloneDeep(tasks)
 
     // 1. 修复父任务时间以包含所有后代任务（从后向前，保证多层父任务收敛）
     for (let i = fixedTasks.length - 1; i >= 0; i--) {
@@ -319,6 +369,19 @@ export const useProjectStore = defineStore('project', () => {
     return { fixedTasks, fixes }
   }
 
+  // 启动时只校正叶子任务的日期状态，父任务再由子任务汇总。
+  function syncTaskSchedule(project = currentProject.value) {
+    const tasks = project?.data?.tasks
+    if (!tasks?.length) return false
+
+    let changed = false
+    for (const task of tasks) {
+      if (syncLeafSchedule(task, tasks)) changed = true
+    }
+    if (rollupParentStatuses(tasks)) changed = true
+    return changed
+  }
+
   // ========== 持久化 ==========
 
   // 保存当前项目到文件。先同步应用自动修复，再一次性写入，
@@ -340,10 +403,10 @@ export const useProjectStore = defineStore('project', () => {
         }
       }
 
-      await invoke('write_file', {
-        path: project.filename,
-        content: JSON.stringify({ meta: project.meta, data: project.data }, null, 2)
-      })
+      await writeProjectFile(
+        project.filename,
+        JSON.stringify({ meta: project.meta, data: project.data }, null, 2)
+      )
       return true
     } catch (error) {
       console.error('保存项目失败:', error)
@@ -373,6 +436,9 @@ export const useProjectStore = defineStore('project', () => {
     saveProject,
     saveCurrentProject,
     updateParentTaskStatus,
-    syncAllParentCompletion
+    applyTaskStatus,
+    postponeTask,
+    refreshTaskSchedule,
+    syncTaskSchedule
   }
 })

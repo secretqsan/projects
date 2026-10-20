@@ -1,5 +1,7 @@
 <script setup>
-import { ref, onMounted, onUnmounted } from 'vue'
+import { ref } from 'vue'
+import { useEventListener } from '@vueuse/core'
+import clamp from 'lodash/clamp'
 
 const props = defineProps({
   minLeftWidth: {
@@ -32,29 +34,22 @@ function onMouseMove(e) {
   const containerRect = containerRef.value.getBoundingClientRect()
   const newWidth = e.clientX - containerRect.left
 
-  leftWidth.value = Math.max(props.minLeftWidth, Math.min(props.maxLeftWidth, newWidth))
+  leftWidth.value = clamp(newWidth, props.minLeftWidth, props.maxLeftWidth)
 }
 
 function stopResize() {
+  if (!isResizing.value) return
   isResizing.value = false
   document.body.style.cursor = ''
   document.body.style.userSelect = ''
 }
 
-onMounted(() => {
-  document.addEventListener('mousemove', onMouseMove)
-  document.addEventListener('mouseup', stopResize)
-})
-
-onUnmounted(() => {
-  document.removeEventListener('mousemove', onMouseMove)
-  document.removeEventListener('mouseup', stopResize)
-})
+useEventListener(document, 'mousemove', onMouseMove)
+useEventListener(document, 'mouseup', stopResize)
 </script>
 
 <template>
   <div ref="containerRef" class="flex h-full overflow-hidden">
-    <!-- 左侧面板 -->
     <div
       class="flex flex-col h-full overflow-hidden bg-[var(--bg-card)]"
       :style="{ width: leftWidth + 'px' }"
@@ -62,7 +57,6 @@ onUnmounted(() => {
       <slot name="left" />
     </div>
 
-    <!-- 拖动条 -->
     <div
       class="w-1 cursor-col-resize bg-[var(--border-color)] hover:bg-[var(--accent-color)] transition-colors flex items-center justify-center"
       :class="{ 'bg-[var(--accent-color)]': isResizing }"
@@ -71,7 +65,6 @@ onUnmounted(() => {
       <div class="w-0.5 h-8 bg-[var(--text-muted)] rounded-full opacity-50"></div>
     </div>
 
-    <!-- 右侧面板 -->
     <div class="flex-1 flex flex-col h-full overflow-hidden min-w-0">
       <slot name="right" />
     </div>

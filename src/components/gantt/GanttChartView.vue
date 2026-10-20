@@ -1,5 +1,7 @@
 <script setup>
 import { ref, computed } from 'vue'
+import { useI18n } from 'vue-i18n'
+import clamp from 'lodash/clamp'
 import ZoomSlider from '../ui/ZoomSlider.vue'
 import GanttChartBackground from './GanttChartBackground.vue'
 
@@ -8,6 +10,7 @@ const props = defineProps({
   selectedTaskIds: { type: Set, default: () => new Set() }
 })
 
+const { t } = useI18n()
 const emit = defineEmits(['update:tasks', 'selection-changed', 'connection-selected'])
 
 const ganttChartBackgroundRef = ref(null)
@@ -24,9 +27,10 @@ const zoomPercent = ref(50)
 const minZoom = 10
 const maxZoom = 100
 
-const rowHeight = computed(() =>
-  minRowHeight + (maxRowHeight - minRowHeight) * (zoomPercent.value - minZoom) / (maxZoom - minZoom)
-)
+const rowHeight = computed(() => {
+  const t = (clamp(zoomPercent.value, minZoom, maxZoom) - minZoom) / (maxZoom - minZoom)
+  return minRowHeight + (maxRowHeight - minRowHeight) * t
+})
 
 const timeSpanDays = ref(30)
 const minTimeSpan = 7
@@ -51,14 +55,14 @@ const maxTimeSpan = 365
 
       <div class="h-10 px-4 py-2 border-t border-[var(--border-color)] bg-[var(--bg-secondary)] flex-shrink-0 flex items-center gap-3">
         <i class="pi pi-calendar text-xs text-[var(--text-muted)]"></i>
-        <span class="text-xs text-[var(--text-muted)] whitespace-nowrap">时间跨度</span>
+        <span class="text-xs text-[var(--text-muted)] whitespace-nowrap">{{ $t('gantt.timeSpan') }}</span>
         <ZoomSlider
           v-model="timeSpanDays"
           :min="minTimeSpan"
           :max="maxTimeSpan"
           :step="1"
           direction="horizontal"
-          :label-formatter="(v) => v + '天'"
+          :label-formatter="(v) => t('common.days', { n: v })"
           class="flex-1"
         />
       </div>

@@ -1,5 +1,15 @@
 @import "tailwindcss";
 
+html {
+  user-select: none;
+}
+
+input,
+textarea,
+[contenteditable="true"] {
+  user-select: text;
+}
+
 /* 暗色模式变量 */
 :root {
   --bg-primary: #ffffff;

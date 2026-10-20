@@ -1,19 +1,21 @@
 <script setup>
-import { ref, watch, nextTick } from 'vue'
+import { computed, ref, watch, nextTick } from 'vue'
+import { useI18n } from 'vue-i18n'
 import { useProjectStore } from '../stores/project'
 import { Modal } from './ui'
 
+const { t } = useI18n()
 const projectStore = useProjectStore()
 
-const groupTypes = [
-  { value: 'machine', label: '机器' },
-  { value: 'human', label: '人力' },
-  { value: 'material', label: '物料' },
-  { value: 'other', label: '其他' }
-]
+const groupTypes = computed(() => [
+  { value: 'machine', label: t('resources.types.machine') },
+  { value: 'human', label: t('resources.types.human') },
+  { value: 'material', label: t('resources.types.material') },
+  { value: 'other', label: t('resources.types.other') }
+])
 
 function getGroupTypeLabel(type) {
-  return groupTypes.find(t => t.value === type)?.label || type
+  return groupTypes.value.find(item => item.value === type)?.label || type
 }
 
 // ========== 资源组管理 ==========
@@ -63,7 +65,7 @@ function saveGroup() {
 }
 
 function deleteGroup(groupId) {
-  if (confirm('确定要删除这个资源组吗？组内的所有资源也将被删除。')) {
+  if (confirm(t('resources.confirmDeleteGroup'))) {
     projectStore.removeResourceGroup(groupId)
     projectStore.saveCurrentProject()
   }
@@ -121,7 +123,7 @@ function cancelResourceNameEdit() {
 }
 
 function deleteResource(groupId, resourceId) {
-  if (confirm('确定要删除这个资源吗？')) {
+  if (confirm(t('resources.confirmDeleteResource'))) {
     projectStore.removeResource(groupId, resourceId)
     projectStore.saveCurrentProject()
   }
@@ -164,13 +166,13 @@ watch(
     <div class="max-w-6xl mx-auto">
       <!-- 页面标题 -->
       <div class="flex items-center justify-between mb-6">
-        <h2 class="text-xl font-semibold text-[var(--text-primary)]">资源管理</h2>
+        <h2 class="text-xl font-semibold text-[var(--text-primary)]">{{ $t('resources.title') }}</h2>
         <button
           class="flex items-center gap-2 px-4 py-2 bg-[var(--accent-color)] text-white text-sm font-medium rounded-lg hover:bg-[var(--accent-hover)] transition-colors"
           @click="openNewGroupModal"
         >
           <i class="pi pi-plus"></i>
-          新建资源组
+          {{ $t('resources.newGroup') }}
         </button>
       </div>
 
@@ -196,30 +198,30 @@ watch(
                 v-if="group.exclusive"
                 class="text-xs px-2 py-0.5 bg-amber-100 text-amber-700 rounded dark:bg-amber-900/30 dark:text-amber-400"
               >
-                独占
+                {{ $t('resources.exclusive') }}
               </span>
               <span class="text-xs text-[var(--text-muted)]">
-                ({{ group.resources?.length || 0 }} 个资源)
+                {{ $t('resources.count', { n: group.resources?.length || 0 }) }}
               </span>
             </div>
             <div class="flex items-center gap-2">
               <button
                 class="p-1.5 text-[var(--text-muted)] hover:text-[var(--accent-color)] hover:bg-[var(--accent-color)]/10 rounded transition-colors"
-                title="添加资源"
+                :title="$t('resources.add')"
                 @click.stop="openNewResourceModal(group.id)"
               >
                 <i class="pi pi-plus text-sm"></i>
               </button>
               <button
                 class="p-1.5 text-[var(--text-muted)] hover:text-[var(--text-primary)] hover:bg-[var(--bg-secondary)] rounded transition-colors"
-                title="编辑"
+                :title="$t('common.edit')"
                 @click.stop="openEditGroupModal(group)"
               >
                 <i class="pi pi-pencil text-sm"></i>
               </button>
               <button
                 class="p-1.5 text-[var(--text-muted)] hover:text-red-600 hover:bg-red-500/10 rounded transition-colors"
-                title="删除"
+                :title="$t('common.delete')"
                 @click.stop="deleteGroup(group.id)"
               >
                 <i class="pi pi-trash text-sm"></i>
@@ -237,7 +239,7 @@ watch(
             class="border-t border-[var(--border-color)]"
           >
             <div v-if="!group.resources || group.resources.length === 0" class="px-4 py-6 text-center">
-              <p class="text-sm text-[var(--text-muted)]">暂无资源，点击上方 + 按钮添加</p>
+              <p class="text-sm text-[var(--text-muted)]">{{ $t('resources.emptyResources') }}</p>
             </div>
             <div v-else class="divide-y divide-[var(--border-color)]">
               <div
@@ -261,7 +263,7 @@ watch(
                   <template v-else>
                     <span
                       class="text-sm text-[var(--text-primary)] cursor-pointer hover:text-[var(--accent-color)]"
-                      title="双击编辑名称"
+                      :title="$t('resources.editName')"
                       @dblclick="startEditResourceName(group.id, resource)"
                     >
                       {{ resource.name }}
@@ -272,7 +274,7 @@ watch(
                 <div class="flex items-center gap-1 ml-2">
                   <button
                     class="p-1.5 text-[var(--text-muted)] hover:text-red-600 hover:bg-red-500/10 rounded transition-colors"
-                    title="删除"
+                    :title="$t('common.delete')"
                     @click="deleteResource(group.id, resource.id)"
                   >
                     <i class="pi pi-trash text-xs"></i>
@@ -289,26 +291,26 @@ watch(
           class="text-center py-12 bg-[var(--bg-card)] rounded-lg border border-[var(--border-color)]"
         >
           <i class="pi pi-inbox text-4xl text-[var(--text-muted)] mb-4 block"></i>
-          <p class="text-[var(--text-secondary)]">暂无资源组</p>
-          <p class="text-sm text-[var(--text-muted)] mt-1">点击按钮创建第一个资源组</p>
+          <p class="text-[var(--text-secondary)]">{{ $t('resources.emptyGroups') }}</p>
+          <p class="text-sm text-[var(--text-muted)] mt-1">{{ $t('resources.emptyGroupsHint') }}</p>
         </div>
       </div>
     </div>
 
     <!-- 资源组弹窗 -->
-    <Modal v-model="showGroupModal" :title="editingGroup ? '编辑资源组' : '新建资源组'" width="max-w-md">
+    <Modal v-model="showGroupModal" :title="editingGroup ? t('resources.editGroup') : t('resources.newGroup')" width="max-w-md">
       <div class="space-y-4">
         <div>
-          <label class="block text-sm font-medium text-[var(--text-primary)] mb-1">名称</label>
+          <label class="block text-sm font-medium text-[var(--text-primary)] mb-1">{{ $t('resources.name') }}</label>
           <input
             v-model="groupForm.name"
             type="text"
             class="w-full px-3 py-2 bg-[var(--bg-secondary)] border border-[var(--border-color)] rounded-lg text-[var(--text-primary)] outline-none focus:border-[var(--accent-color)]"
-            placeholder="输入资源组名称"
+            :placeholder="$t('resources.namePlaceholder')"
           />
         </div>
         <div>
-          <label class="block text-sm font-medium text-[var(--text-primary)] mb-1">类型</label>
+          <label class="block text-sm font-medium text-[var(--text-primary)] mb-1">{{ $t('resources.type') }}</label>
           <select
             v-model="groupForm.type"
             class="w-full px-3 py-2 bg-[var(--bg-secondary)] border border-[var(--border-color)] rounded-lg text-[var(--text-primary)] outline-none focus:border-[var(--accent-color)]"
@@ -325,7 +327,7 @@ watch(
             type="checkbox"
             class="w-4 h-4 rounded border-[var(--border-color)] text-[var(--accent-color)] focus:ring-[var(--accent-color)]"
           />
-          <label for="exclusive" class="text-sm text-[var(--text-primary)]">独占模式（同一时间只能分配给一个任务）</label>
+          <label for="exclusive" class="text-sm text-[var(--text-primary)]">{{ $t('resources.exclusiveMode') }}</label>
         </div>
       </div>
       <template #footer="{ close }">
@@ -333,27 +335,27 @@ watch(
           class="px-4 py-2 text-sm text-[var(--text-secondary)] hover:text-[var(--text-primary)] transition-colors"
           @click="close"
         >
-          取消
+          {{ $t('common.cancel') }}
         </button>
         <button
           class="px-4 py-2 text-sm bg-[var(--accent-color)] text-white rounded-lg hover:bg-[var(--accent-hover)] transition-colors"
           @click="saveGroup"
         >
-          保存
+          {{ $t('common.save') }}
         </button>
       </template>
     </Modal>
 
     <!-- 新建资源弹窗 -->
-    <Modal v-model="showResourceModal" title="新建资源" width="max-w-md">
+    <Modal v-model="showResourceModal" :title="$t('resources.newResource')" width="max-w-md">
       <div class="space-y-4">
         <div>
-          <label class="block text-sm font-medium text-[var(--text-primary)] mb-1">名称</label>
+          <label class="block text-sm font-medium text-[var(--text-primary)] mb-1">{{ $t('resources.name') }}</label>
           <input
             v-model="resourceForm.name"
             type="text"
             class="w-full px-3 py-2 bg-[var(--bg-secondary)] border border-[var(--border-color)] rounded-lg text-[var(--text-primary)] outline-none focus:border-[var(--accent-color)]"
-            placeholder="输入资源名称"
+            :placeholder="$t('resources.resourcePlaceholder')"
             @keydown.enter="saveResource"
           />
         </div>
@@ -363,13 +365,13 @@ watch(
           class="px-4 py-2 text-sm text-[var(--text-secondary)] hover:text-[var(--text-primary)] transition-colors"
           @click="close"
         >
-          取消
+          {{ $t('common.cancel') }}
         </button>
         <button
           class="px-4 py-2 text-sm bg-[var(--accent-color)] text-white rounded-lg hover:bg-[var(--accent-hover)] transition-colors"
           @click="saveResource"
         >
-          保存
+          {{ $t('common.save') }}
         </button>
       </template>
     </Modal>

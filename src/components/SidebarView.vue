@@ -1,21 +1,36 @@
 <script setup>
 import { ref, computed, nextTick, onMounted, onUnmounted } from 'vue'
+import { useI18n } from 'vue-i18n'
+import { autoUpdate, flip, offset, shift, useFloating } from '@floating-ui/vue'
+import { onClickOutside } from '@vueuse/core'
 import { getCurrentWebview } from '@tauri-apps/api/webview'
 import { useProjectStore } from '../stores/project'
 import { useRuntimeStateStore } from '../stores/runtimeState'
 import { useConfigStore } from '../stores/config'
 import { openProject, selectFileToOpen, selectFileToSave } from '../utils/file'
+import { showHoverTip, moveHoverTip, hideHoverTip } from '../utils/hoverTip'
+import find from 'lodash/find'
+import get from 'lodash/get'
 
+const { t } = useI18n()
 const emit = defineEmits(['delete-project', 'copy-project'])
 
 const projectStore = useProjectStore()
 const runtimeState = useRuntimeStateStore()
 const configStore = useConfigStore()
 
-// 菜单状态
-const menuVisible = ref(false)
+const menuOpen = ref(false)
 const menuProjectId = ref(null)
-const menuPosition = ref({ x: 0, y: 0 })
+const menuButton = ref(null)
+const menuEl = ref(null)
+
+const { floatingStyles } = useFloating(menuButton, menuEl, {
+  strategy: 'fixed',
+  placement: 'bottom-end',
+  open: menuOpen,
+  whileElementsMounted: autoUpdate,
+  middleware: [offset(4), flip(), shift({ padding: 8 })]
+})
 
 // 自定义聚焦指令
 const vFocus = {
@@ -29,15 +44,15 @@ const vFocus = {
 
 const projectList = computed(() =>
   projectStore.projects.map(p => ({
-    id: p.meta?.id,
-    name: p.meta?.name || p.meta?.id
+    id: get(p, 'meta.id'),
+    name: get(p, 'meta.name') || get(p, 'meta.id')
   }))
 )
 
-const activeProjectId = computed(() => projectStore.currentProject?.meta?.id || null)
+const activeProjectId = computed(() => get(projectStore.currentProject, 'meta.id', null))
 
 function selectProject(projectId) {
-  const project = projectStore.projects.find(p => p.meta?.id === projectId)
+  const project = find(projectStore.projects, p => get(p, 'meta.id') === projectId)
   projectStore.setCurrentProject(project || null)
   runtimeState.showProject()
 }
@@ -46,15 +61,22 @@ function selectProject(projectId) {
 
 function showMenu(projectId, event) {
   event.stopPropagation()
+  hideHoverTip()
+  if (menuOpen.value && menuProjectId.value === projectId) {
+    hideMenu()
+    return
+  }
   menuProjectId.value = projectId
-  menuPosition.value = { x: event.clientX, y: event.clientY }
-  menuVisible.value = true
+  menuButton.value = event.currentTarget
+  menuOpen.value = true
 }
 
 function hideMenu() {
-  menuVisible.value = false
+  menuOpen.value = false
   menuProjectId.value = null
 }
+
+onClickOutside(menuEl, hideMenu, { ignore: [menuButton] })
 
 function copyProject() {
   if (menuProjectId.value) {
@@ -88,7 +110,7 @@ async function openProjectFromFile(filename) {
   if (result.success) {
     runtimeState.showProject()
   } else {
-    openError.value = result.error || '打开项目失败'
+    openError.value = result.error || t('nav.openFailed')
   }
   return result
 }
@@ -117,8 +139,8 @@ const editingName = ref('')
 
 function startEditing(projectId) {
   editingProjectId.value = projectId
-  const project = projectStore.projects.find(p => p.meta?.id === projectId)
-  editingName.value = project?.meta?.name || ''
+  const project = find(projectStore.projects, p => get(p, 'meta.id') === projectId)
+  editingName.value = get(project, 'meta.name', '')
 }
 
 function saveProjectName() {
@@ -128,7 +150,7 @@ function saveProjectName() {
   editingName.value = ''
   if (!projectId || !name) return
 
-  const project = projectStore.projects.find(p => p.meta?.id === projectId)
+  const project = find(projectStore.projects, p => get(p, 'meta.id') === projectId)
   if (!project?.meta || project.meta.name === name) return
   project.meta.name = name
   projectStore.saveProject(project)
@@ -180,19 +202,21 @@ onUnmounted(() => {
 <template>
   <aside class="w-56 bg-[var(--bg-card)] border-r border-[var(--border-color)] flex flex-col">
     <!-- 菜单头部 -->
-    <div class="h-14 flex items-center px-4 border-b border-[var(--border-color)] gap-2">
-      <span class="text-sm font-semibold text-[var(--text-primary)]">导航</span>
+    <div class="h-12 flex items-center px-4 border-b border-[var(--border-color)]">
+      <span class="text-sm font-semibold text-[var(--text-primary)]">{{ $t('nav.title') }}</span>
     </div>
 
     <!-- 菜单列表 -->
     <nav class="flex-1 overflow-y-auto py-2">
       <!-- 分组标题和新建按钮 -->
       <div class="px-4 py-2 flex items-center justify-between">
-        <span class="text-xs font-medium text-[var(--text-muted)] uppercase tracking-wider">项目管理</span>
+        <span class="text-xs font-medium text-[var(--text-muted)] uppercase tracking-wider">{{ $t('nav.projects') }}</span>
         <button
           class="flex items-center gap-1.5 px-1.5 py-1.5 text-xs font-medium text-[var(--accent-color)] bg-[var(--accent-color)]/10 hover:bg-[var(--accent-color)]/20 rounded-md transition-colors"
-          title="新建项目"
           @click="createNewProject"
+          @mouseenter="showHoverTip(t('nav.newProject'), $event)"
+          @mousemove="moveHoverTip"
+          @mouseleave="hideHoverTip"
         >
           <i class="pi pi-plus"></i>
         </button>
@@ -208,6 +232,9 @@ onUnmounted(() => {
           : 'text-[var(--text-secondary)] hover:bg-[var(--bg-secondary)] hover:text-[var(--text-primary)]'"
         @click="selectProject(project.id)"
         @dblclick="startEditing(project.id)"
+        @mouseenter="editingProjectId === project.id ? hideHoverTip() : showHoverTip(project.name, $event)"
+        @mousemove="moveHoverTip"
+        @mouseleave="hideHoverTip"
       >
         <i class="pi pi-folder text-sm"></i>
         <template v-if="editingProjectId === project.id">
@@ -225,43 +252,39 @@ onUnmounted(() => {
         <button
           v-if="editingProjectId !== project.id"
           class="flex items-center justify-center p-1.5 text-[var(--text-muted)] hover:text-[var(--accent-color)] hover:bg-[var(--accent-color)]/10 rounded transition-all duration-150"
-          title="更多操作"
           @click="showMenu(project.id, $event)"
+          @mouseenter.stop="showHoverTip(t('nav.more'), $event)"
+          @mousemove.stop="moveHoverTip"
+          @mouseleave="hideHoverTip"
         >
           <i class="pi pi-ellipsis-h text-xs"></i>
         </button>
       </button>
 
-      <!-- 右键菜单 -->
-      <div
-        v-if="menuVisible"
-        class="fixed bg-[var(--bg-card)] border border-[var(--border-color)] rounded-lg shadow-lg py-1 z-50 min-w-[120px]"
-        :style="{ left: menuPosition.x + 'px', top: menuPosition.y + 'px' }"
-        @click.stop
-      >
-        <button
-          class="w-full flex items-center gap-2 px-3 py-2 text-sm text-[var(--text-primary)] hover:bg-[var(--bg-secondary)] transition-colors"
-          @click="copyProject"
+      <Teleport to="body">
+        <div
+          v-if="menuOpen"
+          ref="menuEl"
+          class="fixed bg-[var(--bg-card)] border border-[var(--border-color)] rounded-lg shadow-lg py-1 z-[9999] min-w-[120px]"
+          :style="floatingStyles"
         >
-          <i class="pi pi-copy text-xs"></i>
-          <span>复制</span>
-        </button>
-        <div class="border-t border-[var(--border-color)] my-1"></div>
-        <button
-          class="w-full flex items-center gap-2 px-3 py-2 text-sm text-red-600 hover:bg-red-500/10 transition-colors"
-          @click="deleteProject"
-        >
-          <i class="pi pi-trash text-xs"></i>
-          <span>删除</span>
-        </button>
-      </div>
-
-      <!-- 点击遮罩关闭菜单 -->
-      <div
-        v-if="menuVisible"
-        class="fixed inset-0 z-40"
-        @click="hideMenu"
-      ></div>
+          <button
+            class="w-full flex items-center gap-2 px-3 py-2 text-sm text-[var(--text-primary)] hover:bg-[var(--bg-secondary)] transition-colors"
+            @click="copyProject"
+          >
+            <i class="pi pi-copy text-xs"></i>
+            <span>{{ $t('common.copy') }}</span>
+          </button>
+          <div class="border-t border-[var(--border-color)] my-1"></div>
+          <button
+            class="w-full flex items-center gap-2 px-3 py-2 text-sm text-red-600 hover:bg-red-500/10 transition-colors"
+            @click="deleteProject"
+          >
+            <i class="pi pi-trash text-xs"></i>
+            <span>{{ $t('common.delete') }}</span>
+          </button>
+        </div>
+      </Teleport>
 
       <!-- 打开项目 - 虚线框拖拽区域 -->
       <div
@@ -272,8 +295,8 @@ onUnmounted(() => {
         @click="openProjectFile"
       >
         <i class="pi pi-folder-open text-2xl"></i>
-        <span class="text-xs font-medium">打开项目</span>
-        <span class="text-[10px] text-[var(--text-muted)]">点击或拖拽文件</span>
+        <span class="text-xs font-medium">{{ $t('nav.openProject') }}</span>
+        <span class="text-[10px] text-[var(--text-muted)]">{{ $t('nav.openHint') }}</span>
       </div>
 
       <!-- 打开失败提示 -->
@@ -283,16 +306,16 @@ onUnmounted(() => {
     </nav>
 
     <!-- 底部设置按钮 -->
-    <div class="p-3 border-t border-[var(--border-color)]">
+    <div class="h-12 px-2 border-t border-[var(--border-color)] flex items-center">
       <button
-        class="w-full flex items-center gap-3 px-3 py-2 text-sm rounded-md transition-colors"
+        class="w-full flex items-center gap-2 px-2 py-1.5 text-sm rounded-md transition-colors"
         :class="runtimeState.isSettingsPage
           ? 'bg-[var(--accent-color)]/10 text-[var(--accent-color)]'
           : 'text-[var(--text-secondary)] hover:bg-[var(--bg-secondary)]'"
         @click="toggleSettings"
       >
         <i class="pi pi-cog text-sm"></i>
-        <span>设置</span>
+        <span>{{ $t('nav.settings') }}</span>
       </button>
     </div>
   </aside>

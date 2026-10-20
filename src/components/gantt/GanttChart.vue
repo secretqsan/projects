@@ -2,11 +2,12 @@
 import { ref, computed, watch } from 'vue'
 import { useProjectStore } from '../../stores/project'
 import { useRuntimeStateStore } from '../../stores/runtimeState'
-import { todayISO, addISODays, diffISODays } from '../../utils/date'
+import { canCompleteTask, canStartTask } from './utils/taskUtils.js'
 import SplitPanel from '../SplitPanel.vue'
 import TaskTable from '../TaskTable.vue'
 import GanttChartView from './GanttChartView.vue'
 import { Button } from '../ui'
+import ProgressBar from '../ui/ProgressBar.vue'
 
 const projectStore = useProjectStore()
 const runtimeState = useRuntimeStateStore()
@@ -53,72 +54,71 @@ watch(() => runtimeState.focusedTaskId, (taskId) => {
 
 // 甘特图拖拽修改任务后保存
 function onTasksUpdated(newTasks) {
+  const previous = new Map((projectStore.currentProject?.data?.tasks || []).map(task => [task.id, task]))
   projectStore.updateTasks(newTasks)
-  projectStore.saveCurrentProject()
-}
-
-// 计算选中任务的统一状态
-const selectedTasksUnifiedStatus = computed(() => {
-  const selectedTasks = tasks.value.filter(t => selectedTaskIds.value.has(t.id))
-  if (selectedTasks.length === 0) return null
-
-  const firstStatus = selectedTasks[0].status
-  const allSameStatus = selectedTasks.every(task => task.status === firstStatus)
-
-  return allSameStatus ? firstStatus : null
-})
-
-const selectedProgress = computed(() => {
-  const selectedTasks = tasks.value.filter(task => selectedTaskIds.value.has(task.id))
-  if (selectedTasks.length === 0) return null
-  const progress = selectedTasks[0].progress ?? 0
-  return selectedTasks.every(task => (task.progress ?? 0) === progress) ? progress : null
-})
-
-// ========== 快捷操作 ==========
-
-function forEachSelectedTask(callback) {
-  for (const taskId of selectedTaskIds.value) {
-    const task = tasks.value.find(t => t.id === taskId)
-    if (task) callback(task)
+  for (const task of newTasks) {
+    const old = previous.get(task.id)
+    if (!old || old.start_date !== task.start_date || old.end_date !== task.end_date) {
+      projectStore.refreshTaskSchedule(task)
+    }
   }
   projectStore.saveCurrentProject()
 }
 
-function completeTask(task) {
-  task.status = 'completed'
-  task.progress = 100
-  task.actual_end_date = todayISO()
-  projectStore.updateParentTaskStatus(task.id)
+const selectedTasks = computed(() =>
+  tasks.value.filter(task => selectedTaskIds.value.has(task.id))
+)
+
+const selectedTasksUnifiedStatus = computed(() => {
+  const selected = selectedTasks.value
+  if (selected.length === 0) return null
+  const status = selected[0].status
+  return selected.every(task => task.status === status) ? status : null
+})
+
+const selectedProgress = computed(() => {
+  const selected = selectedTasks.value
+  if (selected.length === 0) return null
+  const progress = selected[0].progress ?? 0
+  return selected.every(task => (task.progress ?? 0) === progress) ? progress : null
+})
+
+function forEachSelectedTask(callback) {
+  for (const task of selectedTasks.value) callback(task)
+  projectStore.saveCurrentProject()
+}
+
+function canStartSelectedTasks() {
+  return selectedTasks.value.some(task => canStartTask(task, tasks.value))
 }
 
 function startSelectedTasks() {
   forEachSelectedTask(task => {
-    if (task.status !== 'pending') return
-    task.status = 'in_progress'
-    task.actual_start_date = todayISO()
+    projectStore.applyTaskStatus(task, 'in_progress')
   })
 }
 
 function completeSelectedTasks() {
   forEachSelectedTask(task => {
-    if (task.status === 'completed') return
-    completeTask(task)
+    projectStore.applyTaskStatus(task, 'completed')
   })
+}
+
+function canCompleteSelectedTasks() {
+  const selected = selectedTasks.value
+  return selected.length > 0 && selected.every(task => canCompleteTask(task, tasks.value))
 }
 
 function setSelectedTasksProgress(progress) {
-  forEachSelectedTask(task => {
-    if (task.status !== 'in_progress' && task.status !== 'overdue') return
+  for (const task of selectedTasks.value) {
+    if (task.status !== 'in_progress' && task.status !== 'overdue') continue
     task.progress = progress
-  })
+  }
 }
 
-function postponeSelectedTasks(days = 1) {
+function postponeSelectedTasks(days) {
   forEachSelectedTask(task => {
-    if (!task.end_date) return
-    task.end_date = addISODays(task.end_date, days)
-    task.duration = diffISODays(task.start_date, task.end_date)
+    projectStore.postponeTask(task, days)
   })
 }
 
@@ -153,15 +153,15 @@ function moveRight() {
   <div class="flex-1 flex flex-col overflow-hidden bg-[var(--bg-secondary)]">
     <!-- 顶部工具栏 -->
     <div class="flex items-center gap-1 px-3 py-2 border-b border-[var(--border-color)] bg-[var(--bg-card)] flex-shrink-0">
-      <Button icon="pi pi-plus" title="新增" @click="addTask" />
+      <Button icon="pi pi-plus" :title="$t('gantt.add')" @click="addTask" />
       <div class="w-px h-5 bg-[var(--border-color)] mx-1"></div>
-      <Button icon="pi pi-copy" title="复制" @click="copyTask" />
-      <Button icon="pi pi-file-import" title="粘贴" @click="pasteTask" />
+      <Button icon="pi pi-copy" :title="$t('common.copy')" @click="copyTask" />
+      <Button icon="pi pi-file-import" :title="$t('gantt.paste')" @click="pasteTask" />
       <div class="w-px h-5 bg-[var(--border-color)] mx-1"></div>
-      <Button icon="pi pi-trash" title="删除" @click="deleteTask" />
+      <Button icon="pi pi-trash" :title="$t('common.delete')" @click="deleteTask" />
       <div class="w-px h-5 bg-[var(--border-color)] mx-1"></div>
-      <Button icon="pi pi-arrow-left" title="左移" @click="moveLeft" />
-      <Button icon="pi pi-arrow-right" title="右移" @click="moveRight" />
+      <Button icon="pi pi-arrow-left" :title="$t('gantt.moveLeft')" @click="moveLeft" />
+      <Button icon="pi pi-arrow-right" :title="$t('gantt.moveRight')" @click="moveRight" />
 
       <!-- 删除连线按钮（当选中连线时显示） -->
       <template v-if="selectedConnection">
@@ -171,7 +171,7 @@ function moveRight() {
           @click="deleteSelectedConnection"
         >
           <i class="pi pi-trash text-xs"></i>
-          删除连线
+          {{ $t('gantt.deleteLink') }}
         </button>
       </template>
 
@@ -182,49 +182,48 @@ function moveRight() {
         <!-- 待办状态：开始任务 -->
         <template v-if="selectedTasksUnifiedStatus === 'pending'">
           <button
-            class="flex items-center gap-1 px-3 py-1.5 text-xs bg-[var(--accent-color)] text-white rounded hover:opacity-90 transition-opacity"
+            class="flex items-center gap-1 px-3 py-1.5 text-xs rounded transition-opacity"
+            :class="canStartSelectedTasks()
+              ? 'bg-[var(--accent-color)] text-white hover:opacity-90'
+              : 'bg-[var(--bg-secondary)] text-[var(--text-muted)] cursor-not-allowed'"
+            :disabled="!canStartSelectedTasks()"
             @click="startSelectedTasks"
           >
             <i class="pi pi-play text-xs"></i>
-            开始任务
+            {{ $t('gantt.start') }}
           </button>
         </template>
 
-        <!-- 已开始：进度设为所点百分比，完成按钮单独结束任务 -->
+        <!-- 已开始：拖动进度条，到 100% 后自动完成 -->
         <template v-if="selectedTasksUnifiedStatus === 'in_progress' || selectedTasksUnifiedStatus === 'overdue'">
-          <div class="flex items-center gap-1">
-            <button
-              v-for="p in [0, 25, 50, 75]"
-              :key="p"
-              class="px-2 py-1.5 text-xs rounded transition-colors"
-              :class="selectedProgress === p
-                ? 'bg-[var(--accent-color)] text-white'
-                : 'bg-[var(--bg-secondary)] text-[var(--text-primary)] hover:bg-[var(--accent-color)] hover:text-white'"
-              @click="setSelectedTasksProgress(p)"
-            >
-              {{ p }}%
-            </button>
-            <button
-              class="flex items-center gap-1 px-3 py-1.5 text-xs bg-green-500 text-white rounded hover:opacity-90 transition-opacity"
-              @click="completeSelectedTasks"
-            >
-              <i class="pi pi-check text-xs"></i>
-              完成
-            </button>
+          <div class="flex items-center gap-2 shrink-0">
+            <span class="text-xs text-[var(--text-muted)]">{{ $t('gantt.progress') }}</span>
+            <span class="w-8 text-xs font-medium text-[var(--accent-color)]">
+              {{ selectedProgress == null ? '—' : `${selectedProgress}%` }}
+            </span>
+            <div class="w-40 shrink-0">
+              <ProgressBar
+                :model-value="selectedProgress ?? 0"
+                :completable="canCompleteSelectedTasks()"
+                @update:model-value="setSelectedTasksProgress"
+                @commit="projectStore.saveCurrentProject()"
+                @complete="completeSelectedTasks"
+              />
+            </div>
           </div>
         </template>
 
         <!-- 逾期状态：延期 -->
         <template v-if="selectedTasksUnifiedStatus === 'overdue'">
           <div class="flex items-center gap-1">
-            <span class="text-xs text-[var(--text-muted)] mr-1">延期:</span>
+            <span class="text-xs text-[var(--text-muted)] mr-1">{{ $t('gantt.postpone') }}</span>
             <button
               v-for="days in [1, 3, 7]"
               :key="days"
               class="px-2 py-1.5 text-xs rounded bg-amber-500 text-white hover:opacity-90 transition-opacity"
               @click="postponeSelectedTasks(days)"
             >
-              +{{ days }}天
+              {{ $t('gantt.plusDays', { n: days }) }}
             </button>
           </div>
         </template>
@@ -233,7 +232,7 @@ function moveRight() {
         <template v-if="selectedTasksUnifiedStatus === 'completed'">
           <span class="flex items-center gap-1 text-xs text-green-500 px-2">
             <i class="pi pi-check-circle"></i>
-            已完成
+            {{ $t('gantt.done') }}
           </span>
         </template>
       </template>

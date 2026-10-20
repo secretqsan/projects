@@ -12,7 +12,13 @@ function handleLanguageChange(langCode) {
 </script>
 
 <template>
-  <Card :title="$t('language.title')" icon="pi pi-globe" icon-class="text-[var(--accent-color)]">
+  <Card
+    class="relative z-10"
+    overflow-visible
+    :title="$t('language.title')"
+    icon="pi pi-globe"
+    icon-class="text-[var(--accent-color)]"
+  >
     <div class="space-y-3">
       <p class="text-sm text-(--text-secondary)">{{ $t('language.description') }}</p>
 

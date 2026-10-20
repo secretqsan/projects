@@ -1,9 +1,10 @@
 <script setup>
 import { ref, computed, watch, onMounted, onUnmounted, nextTick } from 'vue'
-import { getPixelsPerDay, formatDateShort, addDays, MS_PER_DAY } from './utils/timeScale.js'
+import { useEventListener, useRafFn, useResizeObserver, useTimeoutFn } from '@vueuse/core'
+import { getPixelsPerDay, addDays, MS_PER_DAY } from './utils/timeScale.js'
 import { getVisibleRowRange } from './utils/taskUtils.js'
 import { computeYearIndicators } from './utils/virtualIndicators.js'
-import { todayISO } from '../../utils/date.js'
+import { todayISO, formatDateShort } from '../../utils/date.js'
 
 const props = defineProps({
   timeSpan: { type: Number, required: true },
@@ -73,22 +74,10 @@ const visibleRowRange = computed(() =>
   getVisibleRowRange(scrollTop.value, viewportHeight.value, props.rowHeight, props.taskCount)
 )
 
-let resizeObserver = null
-let wheelEndTimeout = null
-let rafId = null
-
 function updateViewportMetrics() {
   if (!rootRef.value || !scrollRef.value) return
   visibleWidth.value = rootRef.value.clientWidth
   viewportHeight.value = scrollRef.value.clientHeight
-}
-
-function scheduleDraw() {
-  if (rafId !== null) return
-  rafId = requestAnimationFrame(() => {
-    rafId = null
-    drawCanvas()
-  })
 }
 
 function readCssVar(name, fallback) {
@@ -157,6 +146,8 @@ function drawCanvas() {
   ctx.restore()
 }
 
+const { resume: scheduleDraw } = useRafFn(drawCanvas, { immediate: false, once: true })
+
 function panBy(deltaPixels) {
   dragOffsetX.value += deltaPixels
 }
@@ -200,18 +191,24 @@ function onDragEnd() {
   finalizePan()
 }
 
+const { start: scheduleWheelEnd, stop: cancelWheelEnd } = useTimeoutFn(finalizePan, 150, { immediate: false })
+
 function onWheel(e) {
   e.preventDefault()
   const { deltaX, deltaY } = e
 
   if (Math.abs(deltaX) > Math.abs(deltaY)) {
     panBy(-deltaX * 0.5)
-    if (wheelEndTimeout) clearTimeout(wheelEndTimeout)
-    wheelEndTimeout = setTimeout(finalizePan, 150)
+    scheduleWheelEnd()
   } else if (scrollRef.value) {
     scrollRef.value.scrollTop += deltaY
   }
 }
+
+useEventListener(document, 'mousemove', onDragMove)
+useEventListener(document, 'mouseup', onDragEnd)
+useResizeObserver(rootRef, updateViewportMetrics)
+useResizeObserver(scrollRef, updateViewportMetrics)
 
 function onScroll() {
   if (!scrollRef.value) return
@@ -234,25 +231,12 @@ onMounted(async () => {
   await nextTick()
   updateViewportMetrics()
   scheduleDraw()
-
-  resizeObserver = new ResizeObserver(() => {
-    updateViewportMetrics()
-  })
-  if (rootRef.value) resizeObserver.observe(rootRef.value)
-  if (scrollRef.value) resizeObserver.observe(scrollRef.value)
-
-  document.addEventListener('mousemove', onDragMove)
-  document.addEventListener('mouseup', onDragEnd)
   scheduleTodayRefresh()
 })
 
 onUnmounted(() => {
-  resizeObserver?.disconnect()
-  if (wheelEndTimeout) clearTimeout(wheelEndTimeout)
-  if (rafId !== null) cancelAnimationFrame(rafId)
+  cancelWheelEnd()
   if (todayTimer) clearTimeout(todayTimer)
-  document.removeEventListener('mousemove', onDragMove)
-  document.removeEventListener('mouseup', onDragEnd)
 })
 
 </script>
@@ -269,7 +253,7 @@ onUnmounted(() => {
           :style="{ left: yearIndicator.pixelPosition + 'px' }"
         >
           <div class="text-xs font-bold text-[var(--text-primary)] whitespace-nowrap">
-            {{ yearIndicator.year }}年
+            {{ yearIndicator.year }}{{ $t('gantt.yearSuffix') }}
           </div>
         </div>
       </div>

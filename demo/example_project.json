@@ -16,12 +16,10 @@
         "status": "completed",
         "progress": 100,
         "level": 0,
-        "resource_groups": [
-          "pm"
-        ],
+        "resource_groups": ["pm"],
         "dependencies": [],
         "actual_start_date": "2026-09-07",
-        "actual_end_date": "2026-09-16"
+        "actual_end_date": "2026-09-19"
       },
       {
         "id": "plan-kick",
@@ -32,9 +30,7 @@
         "status": "completed",
         "progress": 100,
         "level": 1,
-        "resource_groups": [
-          "pm"
-        ],
+        "resource_groups": ["pm"],
         "dependencies": [],
         "actual_start_date": "2026-09-07",
         "actual_end_date": "2026-09-08"
@@ -48,35 +44,22 @@
         "status": "completed",
         "progress": 100,
         "level": 1,
-        "resource_groups": [
-          "pm",
-          "design"
-        ],
-        "dependencies": [
-          "plan-kick"
-        ],
+        "resource_groups": ["pm", "design"],
+        "dependencies": ["plan-kick"],
         "actual_start_date": "2026-09-09",
-        "actual_end_date": "2026-09-16"
+        "actual_end_date": "2026-09-18"
       },
       {
         "id": "design",
         "name": "产品设计",
         "start_date": "2026-09-21",
-        "end_date": "2026-10-23",
-        "duration": 32,
-        "status": "in_progress",
-        "progress": 55,
+        "end_date": "2026-10-22",
+        "duration": 31,
+        "status": "overdue",
+        "progress": 0,
         "level": 0,
-        "resource_groups": [
-          "design"
-        ],
-        "dependencies": [
-          "plan"
-        ],
-        "actual_start_date": "2026-09-21",
-        "assigned_resources": {
-          "design": "林可"
-        }
+        "resource_groups": ["design"],
+        "dependencies": []
       },
       {
         "id": "design-ia",
@@ -87,17 +70,11 @@
         "status": "completed",
         "progress": 100,
         "level": 1,
-        "resource_groups": [
-          "design"
-        ],
-        "dependencies": [
-          "plan"
-        ],
+        "resource_groups": ["design"],
+        "dependencies": ["plan"],
         "actual_start_date": "2026-09-21",
         "actual_end_date": "2026-09-29",
-        "assigned_resources": {
-          "design": "周宁"
-        }
+        "assigned_resources": { "design": "周宁" }
       },
       {
         "id": "design-review",
@@ -106,41 +83,24 @@
         "end_date": "2026-10-14",
         "duration": 7,
         "status": "overdue",
-        "progress": 60,
+        "progress": 40,
         "level": 1,
-        "resource_groups": [
-          "pm",
-          "design"
-        ],
-        "dependencies": [
-          "design-ia"
-        ],
-        "actual_start_date": "2026-10-10",
-        "assigned_resources": {
-          "pm": "陈晓",
-          "design": "林可"
-        }
+        "resource_groups": ["pm", "design"],
+        "dependencies": ["design-ia"],
+        "actual_start_date": "2026-10-08",
+        "assigned_resources": { "pm": "陈晓", "design": "林可" }
       },
       {
         "id": "design-ui",
         "name": "界面设计",
         "start_date": "2026-10-07",
-        "end_date": "2026-10-23",
-        "duration": 16,
-        "status": "completed",
-        "progress": 100,
+        "end_date": "2026-10-22",
+        "duration": 15,
+        "status": "in_progress",
+        "progress": 0,
         "level": 1,
-        "resource_groups": [
-          "design"
-        ],
-        "dependencies": [
-          "design-ia"
-        ],
-        "actual_start_date": "2026-10-08",
-        "assigned_resources": {
-          "design": "林可"
-        },
-        "actual_end_date": "2026-10-19"
+        "resource_groups": ["design"],
+        "dependencies": []
       },
       {
         "id": "design-home",
@@ -151,17 +111,11 @@
         "status": "completed",
         "progress": 100,
         "level": 2,
-        "resource_groups": [
-          "design"
-        ],
-        "dependencies": [
-          "design-ia"
-        ],
-        "actual_start_date": "2026-10-08",
-        "actual_end_date": "2026-10-14",
-        "assigned_resources": {
-          "design": "林可"
-        }
+        "resource_groups": ["design"],
+        "dependencies": ["design-ia"],
+        "actual_start_date": "2026-10-07",
+        "actual_end_date": "2026-10-13",
+        "assigned_resources": { "design": "林可" }
       },
       {
         "id": "design-order",
@@ -170,18 +124,12 @@
         "end_date": "2026-10-22",
         "duration": 8,
         "status": "in_progress",
-        "progress": 75,
+        "progress": 55,
         "level": 2,
-        "resource_groups": [
-          "design"
-        ],
-        "dependencies": [
-          "design-home"
-        ],
+        "resource_groups": ["design"],
+        "dependencies": ["design-home"],
         "actual_start_date": "2026-10-15",
-        "assigned_resources": {
-          "design": "周宁"
-        }
+        "assigned_resources": { "design": "周宁" }
       },
       {
         "id": "build",
@@ -192,28 +140,8 @@
         "status": "pending",
         "progress": 0,
         "level": 0,
-        "resource_groups": [
-          "dev"
-        ],
+        "resource_groups": ["dev"],
         "dependencies": []
-      },
-      {
-        "id": "build-api",
-        "name": "订单接口",
-        "start_date": "2026-10-26",
-        "end_date": "2026-11-04",
-        "duration": 9,
-        "status": "completed",
-        "progress": 100,
-        "level": 1,
-        "resource_groups": [
-          "dev"
-        ],
-        "dependencies": [
-          "design"
-        ],
-        "actual_start_date": "2026-10-19",
-        "actual_end_date": "2026-10-19"
       },
       {
         "id": "build-app",
@@ -224,12 +152,20 @@
         "status": "pending",
         "progress": 0,
         "level": 1,
-        "resource_groups": [
-          "dev"
-        ],
-        "dependencies": [
-          "design"
-        ]
+        "resource_groups": ["dev"],
+        "dependencies": ["design"]
+      },
+      {
+        "id": "build-api",
+        "name": "订单接口",
+        "start_date": "2026-10-26",
+        "end_date": "2026-11-04",
+        "duration": 9,
+        "status": "pending",
+        "progress": 0,
+        "level": 1,
+        "resource_groups": ["dev"],
+        "dependencies": ["design"]
       },
       {
         "id": "release",
@@ -240,13 +176,8 @@
         "status": "pending",
         "progress": 0,
         "level": 0,
-        "resource_groups": [
-          "qa",
-          "pm"
-        ],
-        "dependencies": [
-          "build"
-        ]
+        "resource_groups": ["qa", "pm"],
+        "dependencies": []
       },
       {
         "id": "release-qa",
@@ -257,25 +188,20 @@
         "status": "pending",
         "progress": 0,
         "level": 1,
-        "resource_groups": [
-          "qa"
-        ],
-        "dependencies": [
-          "build"
-        ]
+        "resource_groups": ["qa"],
+        "dependencies": ["build"]
       },
       {
-        "id": "task_1792407262969_ltr2ya1tm",
+        "id": "feedback",
         "name": "用户反馈调研",
         "start_date": "2026-11-22",
         "end_date": "2026-12-07",
         "duration": 15,
         "status": "pending",
+        "progress": 0,
         "level": 0,
-        "resource_groups": [],
-        "dependencies": [
-          "release-qa"
-        ]
+        "resource_groups": ["pm"],
+        "dependencies": ["release"]
       }
     ],
     "resource_groups": [
@@ -284,12 +210,7 @@
         "name": "项目管理",
         "type": "human",
         "exclusive": false,
-        "resources": [
-          {
-            "id": "res-chen",
-            "name": "陈晓"
-          }
-        ]
+        "resources": [{ "id": "res-chen", "name": "陈晓" }]
       },
       {
         "id": "design",
@@ -297,14 +218,8 @@
         "type": "human",
         "exclusive": false,
         "resources": [
-          {
-            "id": "res-lin",
-            "name": "林可"
-          },
-          {
-            "id": "res-zhou",
-            "name": "周宁"
-          }
+          { "id": "res-lin", "name": "林可" },
+          { "id": "res-zhou", "name": "周宁" }
         ]
       },
       {
@@ -313,14 +228,8 @@
         "type": "human",
         "exclusive": false,
         "resources": [
-          {
-            "id": "res-su",
-            "name": "苏衡"
-          },
-          {
-            "id": "res-ma",
-            "name": "马岚"
-          }
+          { "id": "res-su", "name": "苏衡" },
+          { "id": "res-ma", "name": "马岚" }
         ]
       },
       {
@@ -328,12 +237,7 @@
         "name": "测试",
         "type": "human",
         "exclusive": false,
-        "resources": [
-          {
-            "id": "res-he",
-            "name": "何清"
-          }
-        ]
+        "resources": [{ "id": "res-he", "name": "何清" }]
       }
     ]
   }

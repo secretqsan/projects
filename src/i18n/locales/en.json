@@ -1,4 +1,163 @@
 {
+  "common": {
+    "cancel": "Cancel",
+    "save": "Save",
+    "delete": "Delete",
+    "copy": "Copy",
+    "edit": "Edit",
+    "days": "{n} days",
+    "pleaseSelect": "Select"
+  },
+  "status": {
+    "pending": "Pending",
+    "in_progress": "In progress",
+    "completed": "Completed",
+    "overdue": "Overdue"
+  },
+  "theme": {
+    "blue": "Blue",
+    "purple": "Purple",
+    "green": "Green",
+    "orange": "Orange",
+    "red": "Red",
+    "pink": "Pink"
+  },
+  "nav": {
+    "title": "Navigation",
+    "projects": "Projects",
+    "newProject": "New project",
+    "more": "More",
+    "openProject": "Open project",
+    "openHint": "Click or drop a file",
+    "openFailed": "Failed to open project",
+    "settings": "Settings"
+  },
+  "welcome": {
+    "title": "Welcome to Projects",
+    "description": "Start managing your projects",
+    "hint": "Start from the sidebar"
+  },
+  "search": {
+    "placeholder": "Search tasks...",
+    "empty": "No matching tasks"
+  },
+  "views": {
+    "gantt": "Gantt",
+    "kanban": "Kanban",
+    "resources": "Resources"
+  },
+  "gantt": {
+    "add": "Add",
+    "paste": "Paste",
+    "moveLeft": "Outdent",
+    "moveRight": "Indent",
+    "deleteLink": "Delete link",
+    "start": "Start",
+    "progress": "Progress",
+    "postpone": "Postpone:",
+    "plusDays": "+{n}d",
+    "done": "Done",
+    "timeSpan": "Time span",
+    "yearSuffix": "",
+    "unnamed": "Untitled task",
+    "statusLine": "Status: {status}",
+    "noteLine": "Note: {note}",
+    "dragHandle": "Drag to reorder"
+  },
+  "table": {
+    "name": "Task",
+    "start": "Start",
+    "end": "End",
+    "duration": "Duration (days)",
+    "status": "Status",
+    "level": "Level",
+    "groups": "Resource groups",
+    "dependencies": "Dependencies",
+    "note": "Note",
+    "tip": "{title}: {value}",
+    "statusLocked": "Status is rolled up from subtasks",
+    "depsLocked": "Parent tasks cannot have dependencies",
+    "noGroups": "No resource groups yet. Create one in Resources.",
+    "noOptions": "No options",
+    "newTask": "New task"
+  },
+  "kanban": {
+    "title": "Kanban",
+    "newTask": "New task",
+    "pending": "To do",
+    "inProgress": "In progress",
+    "overdue": "Overdue",
+    "completed": "Done",
+    "empty": "No tasks",
+    "depends": "Depends on: {deps}",
+    "start": "Start",
+    "progress": "Progress",
+    "postpone": "Postpone",
+    "complete": "Complete",
+    "done": "Done",
+    "addTask": "Add task",
+    "inColumn": "({title})",
+    "name": "Name",
+    "namePlaceholder": "Task name",
+    "startDate": "Start",
+    "endDate": "End",
+    "level": "Level",
+    "groups": "Resource groups",
+    "selectGroup": "Select a group...",
+    "dependencies": "Dependencies",
+    "dependenciesHint": "(separate task IDs with ;)",
+    "dependenciesPlaceholder": "e.g. T001; T002",
+    "optional": "Available:",
+    "needName": "Enter a task name",
+    "startTitle": "Start: {name}",
+    "noGroups": "This task has no resource groups",
+    "noResources": "This group has no resources",
+    "postponeTitle": "Postpone: {name}",
+    "postponeDays": "Days",
+    "currentEnd": "Current end: {date}",
+    "nextEnd": "New end: {date}",
+    "confirmPostpone": "Postpone"
+  },
+  "resources": {
+    "title": "Resources",
+    "newGroup": "New group",
+    "editGroup": "Edit group",
+    "exclusive": "Exclusive",
+    "count": "({n} resources)",
+    "add": "Add resource",
+    "emptyResources": "No resources yet. Use + above to add one.",
+    "editName": "Double-click to rename",
+    "emptyGroups": "No resource groups",
+    "emptyGroupsHint": "Create your first group",
+    "namePlaceholder": "Group name",
+    "exclusiveMode": "Exclusive (only one task at a time)",
+    "newResource": "New resource",
+    "resourcePlaceholder": "Resource name",
+    "confirmDeleteGroup": "Delete this group and all of its resources?",
+    "confirmDeleteResource": "Delete this resource?",
+    "name": "Name",
+    "type": "Type",
+    "types": {
+      "machine": "Machine",
+      "human": "People",
+      "material": "Material",
+      "other": "Other"
+    }
+  },
+  "file": {
+    "openTitle": "Open project file",
+    "saveTitle": "Choose save location",
+    "jsonFilter": "JSON file",
+    "invalidJson": "The file is not valid JSON",
+    "invalidProject": "The file is not a valid project (missing meta or data)",
+    "copy": "{stem} Copy{ext}",
+    "copyN": "{stem} Copy {n}{ext}"
+  },
+  "project": {
+    "newName": "New project",
+    "unnamed": "Untitled project",
+    "copyName": "{name} Copy"
+  },
   "settings": {
     "title": "Settings",
     "subtitle": "Manage app preferences and view application information"

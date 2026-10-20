@@ -33,7 +33,7 @@ const config = useConfigStore()
                 : 'border-transparent hover:scale-105'
             ]"
             :style="{ backgroundColor: theme.color }"
-            :title="theme.name"
+            :title="$t(`theme.${theme.code}`)"
             @click="config.setThemeColor(theme.code)"
           >
             <i

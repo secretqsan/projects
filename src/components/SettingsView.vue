@@ -3,8 +3,6 @@ import AppearanceSettings from './settings/AppearanceSettings.vue'
 import LanguageSettings from './settings/LanguageSettings.vue'
 import AboutCard from './settings/AboutCard.vue'
 import SponsorCard from './settings/SponsorCard.vue'
-
-const appVersion = '0.1.0'
 </script>
 
 <template>
@@ -23,7 +21,7 @@ const appVersion = '0.1.0'
       <LanguageSettings />
 
       <!-- 关于 -->
-      <AboutCard :app-version="appVersion" />
+      <AboutCard />
 
       <!-- 赞助 -->
       <SponsorCard />

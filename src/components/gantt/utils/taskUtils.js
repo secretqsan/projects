@@ -1,5 +1,7 @@
+import keyBy from 'lodash/keyBy'
+
 export function taskLevel(task) {
-  return task?.level || 0
+  return task?.level ?? 0
 }
 
 export function parseDependencies(deps) {
@@ -23,6 +25,30 @@ export function collectDescendants(tasks, index) {
 export function directChildren(tasks, index) {
   const parentLevel = taskLevel(tasks[index])
   return collectDescendants(tasks, index).filter(task => taskLevel(task) === parentLevel + 1)
+}
+
+export function isParentTask(tasks, task) {
+  const index = tasks.findIndex(item => item.id === task?.id)
+  return index !== -1 && directChildren(tasks, index).length > 0
+}
+
+export function statusFromChildren(children) {
+  const statuses = children.map(child => child.status || 'pending')
+  if (statuses.every(status => status === 'completed')) return 'completed'
+  if (statuses.some(status => status === 'overdue')) return 'overdue'
+  if (statuses.some(status => status === 'in_progress' || status === 'completed')) return 'in_progress'
+  return 'pending'
+}
+
+export function canCompleteTask(task, tasks) {
+  return !isParentTask(tasks, task)
+}
+
+export function canStartTask(task, tasks) {
+  return Boolean(task)
+    && task.status === 'pending'
+    && canCompleteTask(task, tasks)
+    && areDependenciesCompleted(task, tasks)
 }
 
 export function indexAfterSubtree(tasks, taskId) {
@@ -54,11 +80,24 @@ export function areDependenciesCompleted(task, allTasks) {
   const deps = parseDependencies(task.dependencies)
   if (!deps.length) return true
 
-  const taskMap = new Map(allTasks.map(t => [t.id, t]))
+  const taskMap = keyBy(allTasks, 'id')
   return deps.every(depId => {
-    const depTask = taskMap.get(depId)
+    const depTask = taskMap[depId]
     return !depTask || depTask.status === 'completed'
   })
+}
+
+const statusColors = {
+  in_progress: '#3b82f6',
+  completed: '#22c55e',
+  overdue: '#ef4444'
+}
+
+export function taskStatusColor(task, allTasks) {
+  if (task?.status === 'pending') {
+    return areDependenciesCompleted(task, allTasks) ? '#f97316' : '#94a3b8'
+  }
+  return statusColors[task?.status] || task?.color || '#3b82f6'
 }
 
 export function getVisibleRowRange(scrollTop, viewportHeight, rowHeight, totalRows, buffer = 2) {

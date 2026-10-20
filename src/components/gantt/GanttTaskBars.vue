@@ -6,8 +6,9 @@ import {
   offsetToISODate
 } from './utils/timeScale.js'
 import { addISODays, diffISODays } from '../../utils/date.js'
-import { parseDependencies, buildChildrenSet } from './utils/taskUtils.js'
-import { calculateBezierPath } from './utils/bezier.js'
+import { parseDependencies, buildChildrenSet, isParentTask } from './utils/taskUtils.js'
+import { calculateDependencyPath } from './utils/bezier.js'
+import { hideHoverTip } from '../../utils/hoverTip'
 
 const props = defineProps({
   tasks: { type: Array, default: () => [] },
@@ -196,6 +197,8 @@ function deleteSelectedConnection() {
 defineExpose({ deleteSelectedConnection })
 
 function addDependency(fromTaskId, toTaskId) {
+  const target = props.tasks.find(task => task.id === toTaskId)
+  if (!target || isParentTask(props.tasks, target)) return
   emit('update:tasks', props.tasks.map(t => {
     if (t.id !== toTaskId) return t
     const deps = parseDependencies(t.dependencies)
@@ -233,6 +236,7 @@ function updateLineStartPosition() {
 
 function onMouseMove(e) {
   if (!isDrawingLine.value || !currentLine.value) return
+  hideHoverTip()
   updateLineStartPosition()
   const pos = screenToContainer(e.clientX, e.clientY)
   currentLine.value = { ...currentLine.value, x2: pos.x, y2: pos.y }
@@ -251,6 +255,7 @@ function onMouseUp(e) {
     ref="containerRef"
     class="absolute inset-0 z-20 gantt-task-bars-container"
     @mousemove="onMouseMove"
+    @mouseleave="hideHoverTip"
     @mouseup="onMouseUp"
     @click="selectedConnection = null; emit('connection-selected', null)"
   >
@@ -266,17 +271,25 @@ function onMouseUp(e) {
       }"
     >
       <defs>
-        <marker id="gantt-arrowhead" markerWidth="6" markerHeight="4" refX="5" refY="2" orient="auto">
-          <polygon points="0 0, 6 2, 0 4" fill="#3b82f6" />
+        <marker
+          id="gantt-arrowhead"
+          markerWidth="8"
+          markerHeight="8"
+          refX="7"
+          refY="4"
+          orient="auto"
+          markerUnits="userSpaceOnUse"
+        >
+          <polygon points="0 0, 8 4, 0 8" fill="context-stroke" />
         </marker>
       </defs>
 
       <path
         v-for="line in dependencyLines"
         :key="line.id"
-        :d="calculateBezierPath(line.startDir, line.x1, line.y1, line.x2, line.y2)"
+        :d="calculateDependencyPath(line.startDir, line.x1, line.y1, line.x2, line.y2)"
         :stroke="selectedConnection?.line?.id === line.id ? '#ef4444' : '#3b82f6'"
-        :stroke-width="selectedConnection?.line?.id === line.id ? 4 : 2"
+        stroke-width="2"
         fill="none"
         marker-end="url(#gantt-arrowhead)"
         style="pointer-events: stroke; cursor: pointer;"
@@ -285,11 +298,12 @@ function onMouseUp(e) {
 
       <path
         v-if="currentLine"
-        :d="calculateBezierPath(currentLine.startPoint, currentLine.x1, currentLine.y1, currentLine.x2, currentLine.y2)"
-        stroke="#999"
+        :d="calculateDependencyPath(currentLine.startPoint, currentLine.x1, currentLine.y1, currentLine.x2, currentLine.y2)"
+        stroke="#94a3b8"
         stroke-width="2"
-        stroke-dasharray="5,5"
+        stroke-dasharray="5 5"
         fill="none"
+        marker-end="url(#gantt-arrowhead)"
       />
     </svg>
 

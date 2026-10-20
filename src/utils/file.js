@@ -1,76 +1,62 @@
-import { invoke } from '@tauri-apps/api/core'
+import { basename, dirname, extname, join } from '@tauri-apps/api/path'
+import { open, save } from '@tauri-apps/plugin-dialog'
+import { exists, readTextFile, writeTextFile } from '@tauri-apps/plugin-fs'
+import i18n from '../i18n'
+import { createId } from './id'
 
-/**
- * 显示打开文件对话框
- */
+const t = (key, params) => i18n.global.t(key, params)
+
 export async function selectFileToOpen() {
-  return await invoke('open_file_dialog')
+  const selected = await open({
+    title: t('file.openTitle'),
+    multiple: false,
+    filters: [{ name: t('file.jsonFilter'), extensions: ['json'] }]
+  })
+  return typeof selected === 'string' ? selected : null
 }
 
-/**
- * 显示保存文件对话框
- */
 export async function selectFileToSave() {
-  return await invoke('save_file_dialog')
+  return await save({
+    title: t('file.saveTitle'),
+    defaultPath: 'output.json',
+    filters: [{ name: t('file.jsonFilter'), extensions: ['json'] }]
+  })
 }
 
-function pathSeparator(path) {
-  return path.includes('\\') ? '\\' : '/'
+async function readProjectFile(path) {
+  return readTextFile(path)
 }
 
-function dirname(path) {
-  const sep = pathSeparator(path)
-  const index = path.lastIndexOf(sep)
-  return index === -1 ? '' : path.slice(0, index)
+export async function writeProjectFile(path, content) {
+  return writeTextFile(path, content)
 }
 
-function basename(path) {
-  const sep = pathSeparator(path)
-  const index = path.lastIndexOf(sep)
-  return index === -1 ? path : path.slice(index + 1)
+async function copyCandidate(dir, fileName) {
+  return dir ? join(dir, fileName) : fileName
 }
 
-function joinPath(dir, name) {
-  if (!dir) return name
-  return `${dir}${pathSeparator(dir)}${name}`
-}
-
-async function fileExists(path) {
-  try {
-    await invoke('read_file', { path })
-    return true
-  } catch (error) {
-    const message = typeof error === 'string' ? error : (error?.message || String(error))
-    if (message.includes('NOT_FOUND')) return false
-    throw error
-  }
-}
-
-/** 在原文件同目录生成「xxx 副本.json」，已存在则追加序号 */
 export async function nextCopyFilePath(originalPath) {
-  const dir = dirname(originalPath)
-  const base = basename(originalPath)
-  const dot = base.lastIndexOf('.')
-  const stem = dot === -1 ? base : base.slice(0, dot)
-  const ext = dot === -1 ? '.json' : base.slice(dot)
+  const [dir, extension] = await Promise.all([
+    dirname(originalPath).catch(() => ''),
+    extname(originalPath).catch(() => '')
+  ])
+  const ext = extension ? `.${extension}` : '.json'
+  const stem = await basename(originalPath, extension ? ext : undefined)
 
-  let candidate = joinPath(dir, `${stem} 副本${ext}`)
+  let candidate = await copyCandidate(dir, t('file.copy', { stem, ext }))
   let n = 2
-  while (await fileExists(candidate)) {
-    candidate = joinPath(dir, `${stem} 副本${n}${ext}`)
+  while (await exists(candidate)) {
+    candidate = await copyCandidate(dir, t('file.copyN', { stem, n, ext }))
     n += 1
   }
   return candidate
 }
 
-/**
- * 创建空项目结构
- */
 function createEmptyProject() {
   return {
     meta: {
-      id: `project${Date.now()}`,
-      name: '新建项目',
+      id: createId('project'),
+      name: t('project.newName'),
       app: 'project-manager',
       version: '1.0'
     },
@@ -88,39 +74,31 @@ function isValidProject(project) {
     && project.data && typeof project.data === 'object'
 }
 
-/**
- * 打开项目。文件不存在时创建空项目（新建项目流程）；
- * 文件存在但不是有效项目结构时返回错误，不修改原文件。
- */
 export async function openProject(filename, configStore, projectStore) {
   try {
     let project
     let isNew = false
 
-    let content
-    try {
-      content = await invoke('read_file', { path: filename })
-    } catch (error) {
-      const message = typeof error === 'string' ? error : (error?.message || String(error))
-      if (!message.includes('NOT_FOUND')) {
+    if (!(await exists(filename))) {
+      project = createEmptyProject()
+      await writeProjectFile(filename, JSON.stringify(project, null, 2))
+      isNew = true
+    } else {
+      let content
+      try {
+        content = await readProjectFile(filename)
+      } catch (error) {
+        const message = typeof error === 'string' ? error : (error?.message || String(error))
         return { success: false, project: null, isNew: false, error: message }
       }
-      project = createEmptyProject()
-      await invoke('write_file', {
-        path: filename,
-        content: JSON.stringify(project, null, 2)
-      })
-      isNew = true
-    }
 
-    if (!project) {
       try {
         project = JSON.parse(content)
       } catch {
-        return { success: false, project: null, isNew: false, error: '文件不是有效的 JSON' }
+        return { success: false, project: null, isNew: false, error: t('file.invalidJson') }
       }
       if (!isValidProject(project)) {
-        return { success: false, project: null, isNew: false, error: '文件不是有效的项目格式（缺少 meta 或 data 字段）' }
+        return { success: false, project: null, isNew: false, error: t('file.invalidProject') }
       }
     }
 

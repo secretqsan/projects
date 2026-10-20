@@ -1,10 +1,16 @@
 <script setup>
 import { ref, computed, watch, nextTick } from 'vue'
+import { useI18n } from 'vue-i18n'
+import { onClickOutside, useClipboard, useEventListener, useTimeoutFn } from '@vueuse/core'
 import { useProjectStore } from '../stores/project'
 import draggable from 'vuedraggable'
 import { Tag, StatusBadge } from './ui'
 import { buildChildrenSet, parseDependencies, indexAfterSubtree, taskLevel, descendantEndIndex } from './gantt/utils/taskUtils.js'
 import { todayISO, addISODays, diffISODays } from '../utils/date.js'
+import { showHoverTip, hideHoverTip } from '../utils/hoverTip'
+import find from 'lodash/find'
+import toInteger from 'lodash/toInteger'
+import { createId } from '../utils/id'
 
 const props = defineProps({
   selectedTaskIds: {
@@ -15,10 +21,13 @@ const props = defineProps({
 
 const emit = defineEmits(['selection-changed'])
 
+const { t } = useI18n()
 const projectStore = useProjectStore()
+const tableRoot = ref(null)
 
-// 剪贴板数据
-const clipboard = ref([])
+const clipboardText = ref('')
+const { copy: copyToClipboard } = useClipboard({ legacy: true })
+const dropdownRef = ref(null)
 
 // 展开/收起状态
 const collapsedTasks = ref(new Set())
@@ -47,19 +56,26 @@ const resizingCol = ref(null)
 const resizeStartX = ref(0)
 const resizeStartWidth = ref(0)
 
-// 列定义
+const statusOptions = computed(() => [
+  { value: 'pending', label: t('status.pending') },
+  { value: 'in_progress', label: t('status.in_progress') },
+  { value: 'completed', label: t('status.completed') },
+  { value: 'overdue', label: t('status.overdue') }
+])
+
+// 展示、编辑控件、底层文本都只由列类型决定
 const columns = ref([
   { key: '_dragHandle', title: '', width: 40, editable: false, isDragHandle: true },
-  { key: 'id', title: 'ID', width: 80, editable: false },
-  { key: 'name', title: '任务名称', width: 250, editable: true, type: 'text' },
-  { key: 'start_date', title: '开始日期', width: 120, editable: true, type: 'date' },
-  { key: 'end_date', title: '结束日期', width: 120, editable: true, type: 'date' },
-  { key: 'duration', title: '工期(天)', width: 90, editable: true, type: 'number' },
-  { key: 'status', title: '状态', width: 100, editable: true, type: 'select', options: ['pending', 'in_progress', 'completed'] },
-  { key: 'level', title: '层级', width: 70, editable: true, type: 'number' },
-  { key: 'resource_groups', title: '资源组', width: 150, editable: true, type: 'multiselect' },
-  { key: 'dependencies', title: '依赖', width: 150, editable: true, type: 'multiselect' },
-  { key: 'note', title: '备注', width: 200, editable: true, type: 'text' }
+  { key: 'id', title: 'ID', width: 80, editable: false, type: 'text' },
+  { key: 'name', titleKey: 'table.name', width: 250, editable: true, type: 'text', display: 'tree' },
+  { key: 'start_date', titleKey: 'table.start', width: 120, editable: true, type: 'date' },
+  { key: 'end_date', titleKey: 'table.end', width: 120, editable: true, type: 'date' },
+  { key: 'duration', titleKey: 'table.duration', width: 90, editable: true, type: 'number' },
+  { key: 'status', titleKey: 'table.status', width: 100, editable: true, type: 'select' },
+  { key: 'level', titleKey: 'table.level', width: 70, editable: true, type: 'number' },
+  { key: 'resource_groups', titleKey: 'table.groups', width: 150, editable: true, type: 'tags' },
+  { key: 'dependencies', titleKey: 'table.dependencies', width: 150, editable: true, type: 'tags' },
+  { key: 'note', titleKey: 'table.note', width: 200, editable: true, type: 'text' }
 ])
 
 const allTasks = computed({
@@ -133,16 +149,32 @@ watch(collapsedTasks, () => {
 }, { deep: true })
 
 // 同步外部选中状态到行索引
+function selectedTaskIdsFromTable() {
+  const ids = []
+  const rowIndexes = new Set(selectedRows.value)
+  if (selection.value) {
+    const start = Math.min(selection.value.startRow, selection.value.endRow)
+    const end = Math.max(selection.value.startRow, selection.value.endRow)
+    for (let row = start; row <= end; row++) rowIndexes.add(row)
+  }
+  rowIndexes.forEach(rowIndex => {
+    const task = visibleTasks.value[rowIndex]
+    if (task) ids.push(task.id)
+  })
+  return ids
+}
+
 watch([() => props.selectedTaskIds, visibleTasks], () => {
   // 拖选进行中不回写，避免 emit 回声清空本地选择
   if (isSelecting.value || isRowSelecting.value) return
+  const current = selectedTaskIdsFromTable()
+  const incoming = props.selectedTaskIds
+  if (incoming.size === current.length && current.every(id => incoming.has(id))) return
   selectedRows.value.clear()
   selection.value = null
   lastClickedCell.value = null
   visibleTasks.value.forEach((task, index) => {
-    if (props.selectedTaskIds.has(task.id)) {
-      selectedRows.value.add(index)
-    }
+    if (incoming.has(task.id)) selectedRows.value.add(index)
   })
 }, { immediate: true, deep: true })
 
@@ -175,29 +207,91 @@ function toggleCollapse(taskId) {
 
 // ==================== 单元格数据 ====================
 
-function calculateDuration(start, end) {
-  return diffISODays(start, end)
-}
-
-function calculateEndDate(startDate, duration) {
-  if (!startDate || !duration) return startDate || null
-  return addISODays(startDate, parseInt(duration, 10) || 0)
-}
-
-function getCellValue(task, colKey) {
-  if (colKey === 'duration') {
-    return calculateDuration(task.start_date, task.end_date)
+function columnOptions(col) {
+  if (col.type === 'select') return statusOptions.value
+  if (col.key === 'resource_groups') {
+    return resourceGroupOptions.value.map(id => ({ value: id, label: id }))
   }
-  return task[colKey]
+  if (col.key === 'dependencies') {
+    return taskIdOptions.value.map(id => ({ value: id, label: id }))
+  }
+  return []
 }
 
-function getStatusText(status) {
-  const map = {
-    'pending': '待处理',
-    'in_progress': '进行中',
-    'completed': '已完成'
+function isLockedCell(task, col) {
+  return Boolean(task && col && childrenSet.value.has(task.id) && (col.key === 'status' || col.key === 'dependencies'))
+}
+
+function cellTip(task, col) {
+  if (isLockedCell(task, col)) {
+    return col.key === 'status' ? t('table.statusLocked') : t('table.depsLocked')
   }
-  return map[status] || status
+  if (!task || !col || col.isDragHandle) return ''
+  if (col.type === 'select') {
+    const raw = task[col.key]
+    const label = statusOptions.value.find(option => option.value === raw)?.label || raw
+    return label ? t('table.tip', { title: t(col.titleKey), value: label }) : ''
+  }
+  const text = cellText(task, col)
+  return text ? t('table.tip', { title: t(col.titleKey), value: text }) : ''
+}
+
+function onTableMouseMove(event) {
+  if (isSelecting.value || isRowSelecting.value || editingCell.value) {
+    hideHoverTip()
+    return
+  }
+  const cell = event.target.closest?.('.table-cell')
+  if (!cell?.dataset.cell) {
+    hideHoverTip()
+    return
+  }
+  const [row, col] = cell.dataset.cell.split('-').map(Number)
+  showHoverTip(cellTip(visibleTasks.value[row], columns.value[col]), event)
+}
+
+function cellText(task, col) {
+  if (!task || !col || col.isDragHandle) return ''
+  if (col.key === 'duration') return String(diffISODays(task.start_date, task.end_date))
+  if (col.type === 'tags') return parseDependencies(task[col.key]).join(';')
+  const value = task[col.key]
+  return value == null ? '' : String(value)
+}
+
+function applyCellText(task, col, text) {
+  if (isLockedCell(task, col)) return
+
+  const raw = text ?? ''
+  if (col.type === 'tags') {
+    task[col.key] = parseDependencies(raw)
+    return
+  }
+  if (col.type === 'number') {
+    const value = toInteger(raw)
+    if (col.key === 'duration') {
+      task.duration = value
+      if (task.start_date) task.end_date = addISODays(task.start_date, value)
+      projectStore.refreshTaskSchedule(task)
+    } else if (col.key === 'level') {
+      task.level = Math.max(0, value)
+    } else {
+      task[col.key] = value
+    }
+    return
+  }
+  if (col.key === 'start_date' || col.key === 'end_date') {
+    task[col.key] = raw
+    if (task.start_date && task.end_date) {
+      task.duration = diffISODays(task.start_date, task.end_date)
+    }
+    projectStore.refreshTaskSchedule(task)
+    return
+  }
+  if (col.key === 'status') {
+    projectStore.applyTaskStatus(task, raw)
+    return
+  }
+  task[col.key] = raw
 }
 
 // ==================== 行选择 ====================
@@ -307,6 +401,32 @@ const selectedTasks = computed(() => {
   return tasks
 })
 
+const pendingEditTarget = ref(null)
+const { start: scheduleEditorOpen, stop: cancelEditorOpen } = useTimeoutFn(() => {
+  const target = pendingEditTarget.value
+  if (!target) return
+  beginEdit(target.row, target.col, 'editor')
+  pendingEditTarget.value = null
+}, 220, { immediate: false })
+
+function onCellActivate(event, rowIndex, colIndex) {
+  if (columns.value[colIndex]?.isDragHandle) return
+  if (event.detail >= 3) {
+    cancelEditorOpen()
+    pendingEditTarget.value = null
+    beginEdit(rowIndex, colIndex, 'text')
+    return
+  }
+  if (event.detail === 2) {
+    pendingEditTarget.value = { row: rowIndex, col: colIndex }
+    scheduleEditorOpen()
+    return
+  }
+  cancelEditorOpen()
+  pendingEditTarget.value = null
+  handleCellClick(event, rowIndex, colIndex)
+}
+
 function handleCellClick(event, rowIndex, colIndex) {
   if (columns.value[colIndex]?.isDragHandle) return
 
@@ -345,6 +465,7 @@ function handleCellMouseDown(event, rowIndex, colIndex) {
 
   // 阻止拖动时的原生文本选择
   event.preventDefault()
+  tableRoot.value?.focus()
 
   // 清除行选择
   selectedRows.value.clear()
@@ -363,9 +484,6 @@ function handleCellMouseDown(event, rowIndex, colIndex) {
   lastClickedCell.value = { row: rowIndex, col: colIndex }
 
   emitSelectionChanged()
-
-  document.addEventListener('mousemove', handleCellMouseMove)
-  document.addEventListener('mouseup', handleCellMouseUp)
 }
 
 // 拖拽把手单元格按下：开始行选择拖拽
@@ -377,6 +495,7 @@ function handleDragHandleCellMouseDown(event, rowIndex) {
 
   event.stopPropagation()
   event.preventDefault()
+  tableRoot.value?.focus()
 
   selection.value = null
   lastClickedCell.value = null
@@ -393,9 +512,6 @@ function handleDragHandleCellMouseDown(event, rowIndex) {
     lastSelectedRow.value = rowIndex
     emitSelectionChanged()
   }
-
-  document.addEventListener('mousemove', handleRowSelectionMouseMove)
-  document.addEventListener('mouseup', handleRowSelectionMouseUp)
 }
 
 // 从鼠标位置解析表格行列索引
@@ -433,11 +549,9 @@ function handleCellMouseMove(event) {
 }
 
 function handleCellMouseUp() {
+  if (!isSelecting.value) return
   isSelecting.value = false
   selectionStart.value = null
-
-  document.removeEventListener('mousemove', handleCellMouseMove)
-  document.removeEventListener('mouseup', handleCellMouseUp)
 }
 
 function handleRowSelectionMouseMove(event) {
@@ -459,23 +573,28 @@ function handleRowSelectionMouseMove(event) {
 }
 
 function handleRowSelectionMouseUp() {
+  if (!isRowSelecting.value) return
   isRowSelecting.value = false
   rowSelectionStart.value = null
   rowSelectionStartSelected.value = new Set()
+}
 
-  document.removeEventListener('mousemove', handleRowSelectionMouseMove)
-  document.removeEventListener('mouseup', handleRowSelectionMouseUp)
+function selectColumn(colIndex) {
+  if (columns.value[colIndex]?.isDragHandle || visibleTasks.value.length === 0) return
+  selectedRows.value.clear()
+  lastSelectedRow.value = null
+  selection.value = {
+    startRow: 0,
+    startCol: colIndex,
+    endRow: visibleTasks.value.length - 1,
+    endCol: colIndex
+  }
+  lastClickedCell.value = { row: 0, col: colIndex }
+  emitSelectionChanged()
 }
 
 function emitSelectionChanged() {
-  const selectedIds = []
-  selectedRows.value.forEach(rowIndex => {
-    const task = visibleTasks.value[rowIndex]
-    if (task) {
-      selectedIds.push(task.id)
-    }
-  })
-  emit('selection-changed', selectedIds)
+  emit('selection-changed', selectedTaskIdsFromTable())
 }
 
 function clearSelection() {
@@ -488,28 +607,28 @@ function clearSelection() {
 
 // ==================== 编辑功能 ====================
 
-function startEdit(rowIndex, colIndex) {
+function beginEdit(rowIndex, colIndex, mode) {
   const col = columns.value[colIndex]
-  if (!col || !col.editable || col.isDragHandle) return
-
+  if (!col?.editable) return
   const task = visibleTasks.value[rowIndex]
   if (!task) return
+  if (isLockedCell(task, col)) return
 
-  let value = getCellValue(task, col.key)
-
-  if (col.type === 'multiselect') {
-    value = parseDependencies(value).join(';')
+  const asText = mode === 'text' || col.type === 'text'
+  if (!asText && col.type === 'tags') {
+    editingCell.value = null
+    openTagsEditor(rowIndex, colIndex)
+    return
   }
 
+  activeDropdown.value = null
   editingCell.value = {
     row: rowIndex,
     col: colIndex,
     key: col.key,
-    value,
-    type: col.type,
-    options: col.key === 'resource_groups' ? resourceGroupOptions.value :
-             col.key === 'dependencies' ? taskIdOptions.value :
-             col.options || []
+    value: cellText(task, col),
+    input: asText ? 'text' : col.type,
+    options: columnOptions(col)
   }
 
   nextTick(() => {
@@ -518,53 +637,27 @@ function startEdit(rowIndex, colIndex) {
   })
 }
 
+function onEditorClick(event, rowIndex, colIndex) {
+  if (event.detail >= 3) {
+    saveEdit()
+    beginEdit(rowIndex, colIndex, 'text')
+  }
+  event.stopPropagation()
+}
+
 function saveEdit() {
   if (!editingCell.value) return
 
-  const { row, key, value, type } = editingCell.value
+  const { row, col, value } = editingCell.value
+  const column = columns.value[col]
   const task = visibleTasks.value[row]
   editingCell.value = null
+  if (!task || !column) return
 
-  if (!task) return
-
-  const originalTask = allTasks.value.find(t => t.id === task.id)
+  const originalTask = find(allTasks.value, { id: task.id })
   if (!originalTask) return
 
-  let processedValue = value
-  if (type === 'number') {
-    processedValue = parseInt(value) || 0
-  } else if (type === 'multiselect') {
-    processedValue = typeof value === 'string'
-      ? value.split(';').map(s => s.trim()).filter(s => s)
-      : []
-  }
-
-  if (key === 'duration') {
-    originalTask.duration = processedValue
-    if (originalTask.start_date) {
-      originalTask.end_date = calculateEndDate(originalTask.start_date, processedValue)
-    }
-  } else if (key === 'end_date') {
-    originalTask.end_date = processedValue
-    if (originalTask.start_date && processedValue) {
-      originalTask.duration = calculateDuration(originalTask.start_date, processedValue)
-    }
-  } else if (key === 'start_date') {
-    originalTask.start_date = processedValue
-    if (originalTask.end_date && processedValue) {
-      originalTask.duration = calculateDuration(processedValue, originalTask.end_date)
-    }
-  } else {
-    originalTask[key] = processedValue
-    if (key === 'status' && processedValue === 'completed') {
-      originalTask.progress = 100
-      originalTask.actual_end_date = todayISO()
-    }
-  }
-
-  if (key === 'status') {
-    projectStore.updateParentTaskStatus(originalTask.id)
-  }
+  applyCellText(originalTask, column, value == null ? '' : String(value))
   projectStore.saveCurrentProject()
 }
 
@@ -585,9 +678,6 @@ function startResize(event, colIndex) {
   resizingCol.value = colIndex
   resizeStartX.value = event.clientX
   resizeStartWidth.value = columns.value[colIndex].width
-
-  document.addEventListener('mousemove', handleResizeMove)
-  document.addEventListener('mouseup', handleResizeUp)
 }
 
 function handleResizeMove(event) {
@@ -599,23 +689,30 @@ function handleResizeMove(event) {
 
 function handleResizeUp() {
   resizingCol.value = null
-  document.removeEventListener('mousemove', handleResizeMove)
-  document.removeEventListener('mouseup', handleResizeUp)
 }
+
+useEventListener(document, 'mousemove', (event) => {
+  if (isSelecting.value) handleCellMouseMove(event)
+  else if (isRowSelecting.value) handleRowSelectionMouseMove(event)
+  else if (resizingCol.value !== null) handleResizeMove(event)
+})
+
+useEventListener(document, 'mouseup', () => {
+  if (isSelecting.value) handleCellMouseUp()
+  if (isRowSelecting.value) handleRowSelectionMouseUp()
+  if (resizingCol.value !== null) handleResizeUp()
+})
 
 // ==================== 多选下拉框 ====================
 
 const activeDropdown = ref(null)
 
-function toggleMultiselectDropdown(event, rowIndex, colIndex) {
-  event.stopPropagation()
-
+function openTagsEditor(rowIndex, colIndex) {
   const col = columns.value[colIndex]
   const task = visibleTasks.value[rowIndex]
-  if (!col || !task) return
-
-  const rect = event.target.closest('.multiselect-cell')?.getBoundingClientRect()
-  if (!rect) return
+  const cell = tableRoot.value?.querySelector(`[data-cell="${rowIndex}-${colIndex}"]`)
+  const rect = cell?.getBoundingClientRect()
+  if (!col || !task || !rect) return
 
   if (activeDropdown.value?.row === rowIndex && activeDropdown.value?.col === colIndex) {
     activeDropdown.value = null
@@ -626,10 +723,8 @@ function toggleMultiselectDropdown(event, rowIndex, colIndex) {
     row: rowIndex,
     col: colIndex,
     key: col.key,
-    options: col.key === 'resource_groups' ? resourceGroupOptions.value :
-             col.key === 'dependencies' ? taskIdOptions.value :
-             col.options || [],
-    selectedValues: [...parseDependencies(task[col.key])],
+    options: columnOptions(col),
+    selectedValues: parseDependencies(task[col.key]),
     rect
   }
 }
@@ -648,7 +743,7 @@ function toggleOption(option) {
     selectedValues.push(option)
   }
 
-  const originalTask = allTasks.value.find(t => t.id === task.id)
+  const originalTask = find(allTasks.value, { id: task.id })
   if (originalTask) {
     originalTask[key] = [...selectedValues]
     projectStore.saveCurrentProject()
@@ -656,7 +751,8 @@ function toggleOption(option) {
 }
 
 function removeTag(task, key, tag) {
-  const originalTask = allTasks.value.find(t => t.id === task.id)
+  if (childrenSet.value.has(task.id) && key === 'dependencies') return
+  const originalTask = find(allTasks.value, { id: task.id })
   if (!originalTask) return
 
   const currentValues = parseDependencies(originalTask[key])
@@ -668,57 +764,105 @@ function removeTag(task, key, tag) {
   }
 }
 
-function handleDocumentClick(event) {
-  if (!activeDropdown.value) return
-
-  const dropdown = document.querySelector('.multiselect-dropdown')
-  if (dropdown && !dropdown.contains(event.target)) {
-    activeDropdown.value = null
-  }
-}
-
-watch(activeDropdown, (newVal) => {
-  if (newVal) {
-    document.addEventListener('click', handleDocumentClick)
-  } else {
-    document.removeEventListener('click', handleDocumentClick)
-  }
+onClickOutside(dropdownRef, () => {
+  activeDropdown.value = null
 })
 
 // ==================== 剪贴板 ====================
 
-function generateId() {
-  return 'task_' + Date.now() + '_' + Math.random().toString(36).slice(2, 11)
+function selectedCellRange() {
+  if (selection.value) {
+    const { startRow, startCol, endRow, endCol } = selection.value
+    return {
+      r1: Math.min(startRow, endRow),
+      r2: Math.max(startRow, endRow),
+      c1: Math.min(startCol, endCol),
+      c2: Math.max(startCol, endCol)
+    }
+  }
+  if (selectedRows.value.size === 0) return null
+  const rows = [...selectedRows.value]
+  return {
+    r1: Math.min(...rows),
+    r2: Math.max(...rows),
+    c1: 1,
+    c2: columns.value.length - 1
+  }
 }
 
-function copySelectedTasks() {
-  const tasks = selectedTasks.value
-  if (tasks.length === 0) return
+async function copySelectedTasks() {
+  const range = selectedCellRange()
+  if (!range) return
 
-  clipboard.value = tasks.map(task => ({ ...task }))
-}
-
-function pasteTasks() {
-  if (clipboard.value.length === 0) return
-
-  const tasks = allTasks.value
-
-  let insertIndex = tasks.length
-  if (selectedRows.value.size > 0) {
-    const lastVisibleIndex = Math.max(...selectedRows.value)
-    const visibleTask = visibleTasks.value[lastVisibleIndex]
-    if (visibleTask) insertIndex = indexAfterSubtree(tasks, visibleTask.id)
+  const lines = []
+  for (let row = range.r1; row <= range.r2; row++) {
+    const task = visibleTasks.value[row]
+    const cells = []
+    for (let colIndex = range.c1; colIndex <= range.c2; colIndex++) {
+      const col = columns.value[colIndex]
+      cells.push(task && col && !col.isDragHandle ? cellText(task, col) : '')
+    }
+    lines.push(cells.join('\t'))
   }
 
-  const tasksToInsert = clipboard.value.map(task => ({
-    ...task,
-    id: generateId()
-  }))
+  const text = lines.join('\n')
+  clipboardText.value = text
+  try {
+    await copyToClipboard(text)
+  } catch {
+    // 系统剪贴板不可用时仍保留内部文本
+  }
+}
 
-  tasks.splice(insertIndex, 0, ...tasksToInsert)
+async function pasteTasks() {
+  let text = ''
+  try {
+    text = await navigator.clipboard.readText()
+  } catch {
+    text = ''
+  }
+  if (!text) text = clipboardText.value
+  if (!text) return
 
-  selectedRows.value.clear()
+  const range = selectedCellRange()
+  const anchor = range
+    ? { row: range.r1, col: range.c1 }
+    : lastClickedCell.value
+  if (!anchor) return
+
+  const grid = text.replace(/\r/g, '').split('\n')
+  if (grid.at(-1) === '') grid.pop()
+
+  grid.forEach((line, rowOffset) => {
+    const task = visibleTasks.value[anchor.row + rowOffset]
+    if (!task) return
+    const originalTask = find(allTasks.value, { id: task.id })
+    if (!originalTask) return
+    line.split('\t').forEach((cell, colOffset) => {
+      const col = columns.value[anchor.col + colOffset]
+      if (!col?.editable) return
+      applyCellText(originalTask, col, cell)
+    })
+  })
   projectStore.saveCurrentProject()
+}
+
+function onTableKeydown(event) {
+  if (event.target.closest('input, textarea, select')) return
+  const key = event.key.toLowerCase()
+  if (key === 'delete' || key === 'backspace') {
+    event.preventDefault()
+    deleteSelectedTasks()
+    return
+  }
+  if (!(event.ctrlKey || event.metaKey)) return
+  if (key === 'c') {
+    event.preventDefault()
+    copySelectedTasks()
+  } else if (key === 'v') {
+    event.preventDefault()
+    pasteTasks()
+  }
 }
 
 function deleteSelectedTasks() {
@@ -746,7 +890,7 @@ function deleteSelectedTasks() {
     })
 
   for (const id of idsToDelete) collapsedTasks.value.delete(id)
-  projectStore.syncAllParentCompletion()
+  projectStore.updateParentTaskStatus()
   clearSelection()
   projectStore.saveCurrentProject()
 }
@@ -770,8 +914,8 @@ function addNewRow() {
 
   const today = todayISO()
   tasks.splice(insertIndex, 0, {
-    id: generateId(),
-    name: '新任务',
+    id: createId('task'),
+    name: t('table.newTask'),
     start_date: today,
     end_date: addISODays(today, 1),
     duration: 1,
@@ -790,7 +934,7 @@ function forEachSelectedTask(callback) {
   indices.forEach(index => {
     const visibleTask = visibleTasks.value[index]
     if (!visibleTask) return
-    const task = tasks.find(t => t.id === visibleTask.id)
+    const task = find(tasks, { id: visibleTask.id })
     if (task) callback(task)
   })
 }
@@ -830,7 +974,14 @@ defineExpose({
 
 <template>
   <div class="flex flex-col h-full bg-[var(--bg-card)]">
-    <div class="flex-1 overflow-auto">
+    <div
+      ref="tableRoot"
+      class="flex-1 overflow-auto outline-none"
+      tabindex="0"
+      @keydown="onTableKeydown"
+      @mousemove="onTableMouseMove"
+      @mouseleave="hideHoverTip"
+    >
       <table class="w-full border-separate border-spacing-0 text-sm table-fixed">
         <thead class="sticky top-0 z-30">
           <tr>
@@ -843,11 +994,16 @@ defineExpose({
                 : 'bg-[var(--bg-secondary)]'"
               :style="{ width: col.width + 'px', minWidth: col.width + 'px' }"
             >
-              <div class="flex items-center justify-between py-2.5 px-3 relative">
-                <span>{{ col.title }}</span>
+              <div
+                class="flex items-center justify-between py-2.5 px-3 relative"
+                :class="col.isDragHandle ? '' : 'cursor-pointer'"
+                @click="selectColumn(index)"
+              >
+                <span>{{ col.titleKey ? $t(col.titleKey) : '' }}</span>
                 <div
                   class="absolute right-0 top-0 bottom-0 w-1 cursor-col-resize bg-transparent hover:bg-blue-500"
                   @mousedown="startResize($event, index)"
+                  @click.stop
                 ></div>
               </div>
             </th>
@@ -862,7 +1018,6 @@ defineExpose({
           drag-class="sortable-drag"
           :animation="150"
           :force-fallback="true"
-          fallback-class="sortable-fallback"
           @start="onDragStart"
           @end="onDragEnd"
         >
@@ -880,12 +1035,13 @@ defineExpose({
                 :class="{
                   'bg-blue-500/25': isCellSelected(rowIndex, colIndex),
                   'bg-blue-500/5': isColInSelection(colIndex),
-                  'p-0 text-center bg-[var(--bg-secondary)] cursor-grab': col.isDragHandle
+                  'p-0 text-center bg-[var(--bg-secondary)] cursor-grab': col.isDragHandle,
+                  'cursor-default': isLockedCell(task, col)
                 }"
+                :data-cell="`${rowIndex}-${colIndex}`"
                 :style="getSelectionOutlineStyle(rowIndex, colIndex)"
-                @click="handleCellClick($event, rowIndex, colIndex)"
+                @click="onCellActivate($event, rowIndex, colIndex)"
                 @mousedown="handleCellMouseDown($event, rowIndex, colIndex)"
-                @dblclick="startEdit(rowIndex, colIndex)"
               >
                 <!-- 拖拽把手列 -->
                 <template v-if="col.isDragHandle">
@@ -898,7 +1054,7 @@ defineExpose({
                     <!-- 拖拽排序图标 -->
                     <div
                       class="drag-handle-icon relative z-[2] flex items-center justify-center w-5 h-5 rounded cursor-grab active:cursor-grabbing text-[var(--text-muted)] hover:text-[var(--text-secondary)] hover:bg-[var(--border-color)] select-none"
-                      title="拖拽调整顺序"
+                      :title="$t('gantt.dragHandle')"
                       @mousedown.prevent
                       @click.stop="handleDragHandleClick($event, rowIndex)"
                     >
@@ -909,17 +1065,10 @@ defineExpose({
                   </div>
                 </template>
 
-                <!-- ID 列 -->
-                <template v-else-if="col.key === 'id'">
-                  <span class="text-[var(--text-primary)]">{{ task.id }}</span>
-                </template>
-
-                <!-- 任务名称列（带展开按钮） -->
-                <template v-else-if="col.key === 'name'">
+                <template v-else-if="col.display === 'tree'">
                   <div
                     class="flex items-center gap-1.5"
                     :style="{ paddingLeft: (task.level * 20) + 'px' }"
-                    @dblclick.stop="startEdit(rowIndex, colIndex)"
                   >
                     <span
                       v-if="childrenSet.has(task.id)"
@@ -929,52 +1078,45 @@ defineExpose({
                       {{ collapsedTasks.has(task.id) ? '▶' : '▼' }}
                     </span>
                     <span v-else class="w-5 shrink-0"></span>
-                    <span class="text-[var(--text-primary)]">{{ task.name }}</span>
+                    <span class="text-[var(--text-primary)]">{{ cellText(task, col) }}</span>
                   </div>
                 </template>
 
-                <!-- 状态列 -->
-                <template v-else-if="col.key === 'status'">
-                  <StatusBadge :status="task.status" />
+                <template v-else-if="col.type === 'select'">
+                  <StatusBadge :status="task[col.key]" />
                 </template>
 
-                <!-- 多选列（资源组、依赖） -->
-                <template v-else-if="col.type === 'multiselect'">
-                  <div class="multiselect-cell flex items-center justify-between gap-2" @dblclick.stop="startEdit(rowIndex, colIndex)">
-                    <div class="flex flex-wrap gap-1 flex-1 overflow-hidden">
-                      <Tag
-                        v-for="tag in parseDependencies(task[col.key])"
-                        :key="tag"
-                        :label="tag"
-                        removable
-                        @remove="removeTag(task, col.key, tag)"
-                      />
-                    </div>
-                    <button
-                      class="w-5 h-5 border-0 text-xs flex items-center justify-center rounded flex-shrink-0 bg-[var(--bg-secondary)] text-[var(--text-secondary)]"
-                      @click.stop="toggleMultiselectDropdown($event, rowIndex, colIndex)"
-                    >
-                      ▼
-                    </button>
+                <template v-else-if="col.type === 'tags'">
+                  <div class="flex flex-wrap gap-1 overflow-hidden">
+                    <Tag
+                      v-for="tag in parseDependencies(task[col.key])"
+                      :key="tag"
+                      :label="tag"
+                      :removable="!isLockedCell(task, col)"
+                      @remove="removeTag(task, col.key, tag)"
+                    />
                   </div>
                 </template>
 
-                <!-- 普通列 -->
                 <template v-else>
-                  <span class="text-[var(--text-primary)]">{{ getCellValue(task, col.key) }}</span>
+                  <span class="text-[var(--text-primary)]">{{ cellText(task, col) }}</span>
                 </template>
 
-                <!-- 编辑状态 -->
+                <i
+                  v-if="isLockedCell(task, col)"
+                  class="pi pi-lock absolute top-1 right-1 text-[10px] leading-none text-[var(--text-muted)] pointer-events-none"
+                ></i>
+
                 <div
                   v-if="editingCell?.row === rowIndex && editingCell?.col === colIndex"
                   class="absolute inset-0 z-10 bg-[var(--bg-card)]"
-                  @click.stop
+                  @click="onEditorClick($event, rowIndex, colIndex)"
                 >
                   <input
-                    v-if="editingCell.type !== 'select'"
+                    v-if="editingCell.input !== 'select'"
                     ref="editInputRef"
                     v-model="editingCell.value"
-                    :type="editingCell.type === 'number' ? 'number' : editingCell.type === 'date' ? 'date' : 'text'"
+                    :type="editingCell.input === 'number' ? 'number' : editingCell.input === 'date' ? 'date' : 'text'"
                     class="w-full h-full border-2 px-2 text-sm outline-none box-border border-[var(--accent-color)] bg-[var(--bg-card)] text-[var(--text-primary)]"
                     @keydown="handleEditKeydown"
                     @blur="saveEdit"
@@ -986,13 +1128,14 @@ defineExpose({
                     class="w-full h-full border-2 px-2 text-sm outline-none box-border border-[var(--accent-color)] bg-[var(--bg-card)] text-[var(--text-primary)]"
                     @change="saveEdit"
                     @blur="saveEdit"
+                    @click.stop
                   >
                     <option
                       v-for="option in editingCell.options"
-                      :key="option"
-                      :value="option"
+                      :key="option.value"
+                      :value="option.value"
                     >
-                      {{ getStatusText(option) }}
+                      {{ option.label }}
                     </option>
                   </select>
                 </div>
@@ -1007,6 +1150,7 @@ defineExpose({
     <Teleport to="body">
       <div
         v-if="activeDropdown"
+        ref="dropdownRef"
         class="multiselect-dropdown fixed rounded shadow-lg z-[1000] min-w-[150px] max-h-[200px] overflow-y-auto bg-[var(--bg-card)] border border-[var(--border-color)]"
         style="box-shadow: 0 4px 12px rgba(0, 0, 0, 0.15);"
         :style="{
@@ -1019,17 +1163,17 @@ defineExpose({
           v-if="activeDropdown.options.length === 0"
           class="px-3 py-2 text-sm text-[var(--text-muted)] whitespace-nowrap"
         >
-          {{ activeDropdown.key === 'resource_groups' ? '暂无资源组，请先在资源管理中创建' : '暂无选项' }}
+          {{ activeDropdown.key === 'resource_groups' ? $t('table.noGroups') : $t('table.noOptions') }}
         </div>
         <div
           v-for="option in activeDropdown.options"
-          :key="option"
+          :key="option.value"
           class="flex items-center gap-2 px-3 py-2 cursor-pointer text-sm text-[var(--text-primary)] hover:bg-[var(--bg-secondary)]"
-          :class="{ 'bg-[var(--accent-color)] text-white': activeDropdown.selectedValues.includes(option) }"
-          @click.stop="toggleOption(option)"
+          :class="{ 'bg-[var(--accent-color)] text-white': activeDropdown.selectedValues.includes(option.value) }"
+          @click.stop="toggleOption(option.value)"
         >
-          <span class="text-sm">{{ activeDropdown.selectedValues.includes(option) ? '☑' : '☐' }}</span>
-          <span>{{ option }}</span>
+          <span class="text-sm">{{ activeDropdown.selectedValues.includes(option.value) ? '☑' : '☐' }}</span>
+          <span>{{ option.label }}</span>
         </div>
       </div>
     </Teleport>

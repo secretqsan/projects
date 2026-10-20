@@ -1,23 +1,27 @@
 <script setup>
+import { onMounted, ref } from 'vue'
+import { getVersion } from '@tauri-apps/api/app'
+import { version as packageVersion } from '../../../package.json'
 import { Card } from '../ui'
 import LogoUrl from '../../assets/logo.svg'
 
-defineProps({
-  appVersion: {
-    type: String,
-    default: '0.1.0'
+const githubUrl = 'https://github.com/secretqsan'
+const appVersion = ref(packageVersion)
+
+onMounted(async () => {
+  if (!window.__TAURI_INTERNALS__) return
+  try {
+    appVersion.value = await getVersion()
+  } catch {
+    // 浏览器预览没有 Tauri 版本接口时，沿用 package.json
   }
 })
-
-const githubUrl = 'https://github.com/secretqsan'
 </script>
 
 <template>
   <Card :title="$t('about.title')" icon="pi pi-info-circle" icon-class="text-[var(--accent-color)]">
     <div class="flex items-center gap-4">
-      <div class="w-16 h-16 rounded-xl flex items-center justify-center shadow-lg overflow-hidden bg-(--bg-card)">
-        <img :src="LogoUrl" alt="Logo" class="w-12 h-12" />
-      </div>
+      <img :src="LogoUrl" alt="Logo" class="w-16 h-16" />
       <div>
         <h3 class="text-lg font-bold text-(--text-primary)">{{ $t('about.appName') }}</h3>
         <p class="text-sm text-(--text-secondary)">{{ $t('about.version') }} {{ appVersion }}</p>

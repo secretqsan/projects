@@ -1,6 +1,9 @@
 <script setup>
-import { ref, computed, watch, onUnmounted } from 'vue'
-import { areDependenciesCompleted } from './utils/taskUtils.js'
+import { ref, computed, watch } from 'vue'
+import { useI18n } from 'vue-i18n'
+import { useEventListener, useTimeoutFn } from '@vueuse/core'
+import { taskStatusColor } from './utils/taskUtils.js'
+import { showHoverTip, hideHoverTip } from '../../utils/hoverTip'
 
 const props = defineProps({
   task: {
@@ -41,6 +44,7 @@ const props = defineProps({
   }
 })
 
+const { t } = useI18n()
 const emit = defineEmits(['select', 'connection-start', 'connection-end', 'resize-end', 'resize', 'move-end', 'move'])
 
 // 是否显示连接点
@@ -71,6 +75,32 @@ watch(() => [props.initialLeftOffset, props.initialRightOffset], ([newLeft, newR
 const width = computed(() => rightOffset.value - leftOffset.value)
 const left = computed(() => props.centerX + leftOffset.value)
 
+function taskTip() {
+  const task = props.task
+  const lines = [task.name || t('gantt.unnamed')]
+  const statusKey = `status.${task.status}`
+  const status = t(statusKey)
+  if (task.status && status !== statusKey) lines.push(t('gantt.statusLine', { status }))
+  if (task.start_date || task.end_date) {
+    lines.push(`${task.start_date || '—'} → ${task.end_date || '—'}`)
+  }
+  if (task.note) lines.push(t('gantt.noteLine', { note: task.note }))
+  return lines.join('\n')
+}
+
+function onBarMouseMove(event) {
+  if (isMoving.value || isResizing.value || event.target?.closest?.('.resize-handle, .connection-point')) {
+    hideHoverTip()
+    return
+  }
+  showHoverTip(taskTip(), event)
+}
+
+function onBarMouseLeave() {
+  hideHoverTip()
+  hideConnectionPointsSoon()
+}
+
 function onMouseEnter() {
   isHovered.value = true
   showConnectionPoints.value = true
@@ -80,25 +110,16 @@ function onPointMouseEnter() {
   isHovered.value = true
 }
 
-let hideTimer = null
+const { start: hideConnectionPointsSoonTimer } = useTimeoutFn(() => {
+  if (!isHovered.value && !isResizing.value) {
+    showConnectionPoints.value = false
+  }
+}, 200, { immediate: false })
 
 function hideConnectionPointsSoon() {
   isHovered.value = false
-  clearTimeout(hideTimer)
-  hideTimer = setTimeout(() => {
-    if (!isHovered.value && !isResizing.value) {
-      showConnectionPoints.value = false
-    }
-  }, 200)
+  hideConnectionPointsSoonTimer()
 }
-
-onUnmounted(() => {
-  clearTimeout(hideTimer)
-  document.removeEventListener('mousemove', onResizeMove)
-  document.removeEventListener('mouseup', onResizeEnd)
-  document.removeEventListener('mousemove', onTaskMove)
-  document.removeEventListener('mouseup', onTaskMoveEnd)
-})
 
 function onTaskClick(e) {
   e.stopPropagation()
@@ -136,9 +157,6 @@ function onResizeStart(e, direction) {
   resizeDirection.value = direction
   resizeOriginX = e.clientX
   resizeStartX.value = e.clientX
-
-  document.addEventListener('mousemove', onResizeMove)
-  document.addEventListener('mouseup', onResizeEnd)
 }
 
 function onResizeMove(e) {
@@ -159,25 +177,22 @@ function onResizeMove(e) {
   emit('resize', {
     task: props.task,
     leftOffset: leftOffset.value,
-    rightOffset: rightOffset.value,
-    direction: resizeDirection.value
+    rightOffset: rightOffset.value
   })
 }
 
 function onResizeEnd() {
+  if (!isResizing.value) return
   const didResize = resizeDragged
   isResizing.value = false
   resizeDragged = false
   resizeDirection.value = null
-  document.removeEventListener('mousemove', onResizeMove)
-  document.removeEventListener('mouseup', onResizeEnd)
   if (!didResize) return
 
   emit('resize-end', {
     task: props.task,
     leftOffset: leftOffset.value,
-    rightOffset: rightOffset.value,
-    direction: resizeDirection.value
+    rightOffset: rightOffset.value
   })
 }
 
@@ -185,24 +200,21 @@ function onResizeEnd() {
 
 let moveOriginX = 0
 let moveDragged = false
-let moveListening = false
+const moveListening = ref(false)
 
 function onTaskMouseDown(e) {
   if (e.button !== 0) return
   if (e.target.closest('.resize-handle') || e.target.closest('.connection-point')) return
 
   e.stopPropagation()
-  moveListening = true
+  moveListening.value = true
   moveDragged = false
   moveOriginX = e.clientX
   moveStartX.value = e.clientX
-
-  document.addEventListener('mousemove', onTaskMove)
-  document.addEventListener('mouseup', onTaskMoveEnd)
 }
 
 function onTaskMove(e) {
-  if (!moveListening) return
+  if (!moveListening.value) return
   if (!moveDragged && Math.abs(e.clientX - moveOriginX) < POINTER_THRESHOLD) return
   if (!moveDragged) {
     moveDragged = true
@@ -222,14 +234,12 @@ function onTaskMove(e) {
 }
 
 function onTaskMoveEnd() {
-  if (!moveListening) return
+  if (!moveListening.value) return
   const didMove = moveDragged
-  moveListening = false
+  moveListening.value = false
   moveDragged = false
   moveOriginX = 0
   isMoving.value = false
-  document.removeEventListener('mousemove', onTaskMove)
-  document.removeEventListener('mouseup', onTaskMoveEnd)
   if (!didMove) return
 
   emit('move-end', {
@@ -239,19 +249,16 @@ function onTaskMoveEnd() {
   })
 }
 
+const resizeTarget = computed(() => (isResizing.value ? document : null))
+const moveTarget = computed(() => (moveListening.value ? document : null))
+useEventListener(resizeTarget, 'mousemove', onResizeMove)
+useEventListener(resizeTarget, 'mouseup', onResizeEnd)
+useEventListener(moveTarget, 'mousemove', onTaskMove)
+useEventListener(moveTarget, 'mouseup', onTaskMoveEnd)
+
 // ========== 样式 ==========
 
-const taskBarColor = computed(() => {
-  const depsCompleted = areDependenciesCompleted(props.task, props.allTasks)
-
-  const statusColors = {
-    'pending': depsCompleted ? '#f97316' : '#94a3b8',   // 橙色 - 待办(依赖完成) | 灰色 - 待办(依赖未完成)
-    'in_progress': '#3b82f6',  // 蓝色 - 进行中
-    'completed': '#22c55e',    // 绿色 - 已完成
-    'overdue': '#ef4444'       // 红色 - 逾期
-  }
-  return statusColors[props.task.status] || props.task.color || '#3b82f6'
-})
+const taskBarColor = computed(() => taskStatusColor(props.task, props.allTasks))
 
 const taskBarStyle = computed(() => ({
   left: left.value + 'px',
@@ -270,7 +277,8 @@ const taskBarStyle = computed(() => ({
     :style="taskBarStyle"
     @click="onTaskClick"
     @mouseenter="onMouseEnter"
-    @mouseleave="hideConnectionPointsSoon"
+    @mousemove="onBarMouseMove"
+    @mouseleave="onBarMouseLeave"
     @mousedown="onTaskMouseDown"
   >
     <!-- 任务名称 -->

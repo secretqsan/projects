@@ -1,4 +1,163 @@
 {
+  "common": {
+    "cancel": "取消",
+    "save": "保存",
+    "delete": "删除",
+    "copy": "复制",
+    "edit": "编辑",
+    "days": "{n}天",
+    "pleaseSelect": "请选择"
+  },
+  "status": {
+    "pending": "待处理",
+    "in_progress": "进行中",
+    "completed": "已完成",
+    "overdue": "已逾期"
+  },
+  "theme": {
+    "blue": "蓝色",
+    "purple": "紫色",
+    "green": "绿色",
+    "orange": "橙色",
+    "red": "红色",
+    "pink": "粉色"
+  },
+  "nav": {
+    "title": "导航",
+    "projects": "项目管理",
+    "newProject": "新建项目",
+    "more": "更多操作",
+    "openProject": "打开项目",
+    "openHint": "点击或拖拽文件",
+    "openFailed": "打开项目失败",
+    "settings": "设置"
+  },
+  "welcome": {
+    "title": "欢迎使用 Projects",
+    "description": "开始管理您的项目，让工作更高效",
+    "hint": "从左侧菜单开始"
+  },
+  "search": {
+    "placeholder": "搜索任务...",
+    "empty": "未找到匹配的任务"
+  },
+  "views": {
+    "gantt": "甘特图",
+    "kanban": "看板",
+    "resources": "资源"
+  },
+  "gantt": {
+    "add": "新增",
+    "paste": "粘贴",
+    "moveLeft": "左移",
+    "moveRight": "右移",
+    "deleteLink": "删除连线",
+    "start": "开始任务",
+    "progress": "进度",
+    "postpone": "延期:",
+    "plusDays": "+{n}天",
+    "done": "已完成",
+    "timeSpan": "时间跨度",
+    "yearSuffix": "年",
+    "unnamed": "未命名任务",
+    "statusLine": "状态：{status}",
+    "noteLine": "备注：{note}",
+    "dragHandle": "拖拽调整顺序"
+  },
+  "table": {
+    "name": "任务名称",
+    "start": "开始日期",
+    "end": "结束日期",
+    "duration": "工期(天)",
+    "status": "状态",
+    "level": "层级",
+    "groups": "资源组",
+    "dependencies": "依赖",
+    "note": "备注",
+    "tip": "{title}：{value}",
+    "statusLocked": "状态由子任务汇总，不可修改",
+    "depsLocked": "父任务不能设置依赖",
+    "noGroups": "暂无资源组，请先在资源管理中创建",
+    "noOptions": "暂无选项",
+    "newTask": "新任务"
+  },
+  "kanban": {
+    "title": "看板",
+    "newTask": "新建任务",
+    "pending": "待办",
+    "inProgress": "进行中",
+    "overdue": "逾期",
+    "completed": "已完成",
+    "empty": "暂无任务",
+    "depends": "依赖: {deps}",
+    "start": "开始任务",
+    "progress": "进度",
+    "postpone": "延期",
+    "complete": "完成",
+    "done": "已完成",
+    "addTask": "添加任务",
+    "inColumn": "({title})",
+    "name": "任务名称",
+    "namePlaceholder": "输入任务名称",
+    "startDate": "开始日期",
+    "endDate": "结束日期",
+    "level": "层级",
+    "groups": "资源组",
+    "selectGroup": "选择资源组...",
+    "dependencies": "依赖任务",
+    "dependenciesHint": "(用分号 ; 分隔多个任务ID)",
+    "dependenciesPlaceholder": "例如: T001; T002",
+    "optional": "可选:",
+    "needName": "请输入任务名称",
+    "startTitle": "开始任务: {name}",
+    "noGroups": "该任务未分配资源组",
+    "noResources": "该资源组暂无资源",
+    "postponeTitle": "延期任务: {name}",
+    "postponeDays": "延期天数",
+    "currentEnd": "当前结束日期: {date}",
+    "nextEnd": "延期后: {date}",
+    "confirmPostpone": "确认延期"
+  },
+  "resources": {
+    "title": "资源管理",
+    "newGroup": "新建资源组",
+    "editGroup": "编辑资源组",
+    "exclusive": "独占",
+    "count": "({n} 个资源)",
+    "add": "添加资源",
+    "emptyResources": "暂无资源，点击上方 + 按钮添加",
+    "editName": "双击编辑名称",
+    "emptyGroups": "暂无资源组",
+    "emptyGroupsHint": "点击按钮创建第一个资源组",
+    "namePlaceholder": "输入资源组名称",
+    "exclusiveMode": "独占模式（同一时间只能分配给一个任务）",
+    "newResource": "新建资源",
+    "resourcePlaceholder": "输入资源名称",
+    "confirmDeleteGroup": "确定要删除这个资源组吗？组内的所有资源也将被删除。",
+    "confirmDeleteResource": "确定要删除这个资源吗？",
+    "name": "名称",
+    "type": "类型",
+    "types": {
+      "machine": "机器",
+      "human": "人力",
+      "material": "物料",
+      "other": "其他"
+    }
+  },
+  "file": {
+    "openTitle": "选择项目文件",
+    "saveTitle": "选择保存位置",
+    "jsonFilter": "JSON 文件",
+    "invalidJson": "文件不是有效的 JSON",
+    "invalidProject": "文件不是有效的项目格式（缺少 meta 或 data 字段）",
+    "copy": "{stem} 副本{ext}",
+    "copyN": "{stem} 副本{n}{ext}"
+  },
+  "project": {
+    "newName": "新建项目",
+    "unnamed": "未命名项目",
+    "copyName": "{name} 副本"
+  },
   "settings": {
     "title": "设置",
     "subtitle": "管理应用偏好和查看应用信息"

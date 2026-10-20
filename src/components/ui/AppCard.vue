@@ -11,12 +11,19 @@ const props = defineProps({
   iconClass: {
     type: String,
     default: ''
+  },
+  overflowVisible: {
+    type: Boolean,
+    default: false
   }
 })
 </script>
 
 <template>
-  <div class="bg-(--bg-card) rounded-lg border border-(--border-color) overflow-hidden shadow-sm">
+  <div
+    class="bg-(--bg-card) rounded-lg border border-(--border-color) shadow-sm"
+    :class="overflowVisible ? 'overflow-visible' : 'overflow-hidden'"
+  >
     <div v-if="title" class="px-6 py-4 border-b border-(--border-color)">
       <h2 class="text-base font-semibold text-(--text-primary) flex items-center gap-2">
         <i v-if="props.icon" :class="[props.icon, props.iconClass || 'text-(--accent-color)']" />

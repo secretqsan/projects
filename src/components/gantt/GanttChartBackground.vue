@@ -1,8 +1,7 @@
 <script setup>
-import { ref, onMounted } from 'vue'
+import { ref } from 'vue'
 import GanttCanvas from './GanttCanvas.vue'
 import GanttTaskBars from './GanttTaskBars.vue'
-import { findEarliestTaskDate } from './utils/timeScale.js'
 
 const props = defineProps({
   timeSpan: { type: Number, required: true },
@@ -14,17 +13,14 @@ const props = defineProps({
 const emit = defineEmits(['update:tasks', 'selection-changed', 'connection-selected'])
 
 const ganttTaskBarsRef = ref(null)
-const centerDate = ref(new Date())
+const today = new Date()
+const centerDate = ref(new Date(today.getFullYear(), today.getMonth(), today.getDate()))
 
 function deleteSelectedConnection() {
   return ganttTaskBarsRef.value?.deleteSelectedConnection?.() || false
 }
 
 defineExpose({ deleteSelectedConnection })
-
-onMounted(() => {
-  centerDate.value = findEarliestTaskDate(props.tasks)
-})
 </script>
 
 <template>

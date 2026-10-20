@@ -1,5 +1,6 @@
 <script setup>
 import { computed, useSlots } from 'vue'
+import { showHoverTip, moveHoverTip, hideHoverTip } from '../../utils/hoverTip'
 
 const props = defineProps({
   variant: {
@@ -73,8 +74,10 @@ const buttonClasses = computed(() => {
     type="button"
     :class="buttonClasses"
     :disabled="disabled"
-    :title="title"
     @click="emit('click', $event)"
+    @mouseenter="title && showHoverTip(title, $event)"
+    @mousemove="title && moveHoverTip($event)"
+    @mouseleave="hideHoverTip"
   >
     <i v-if="icon" :class="[icon, iconSizes[size]]" />
     <slot />

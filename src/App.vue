@@ -5,6 +5,7 @@ import { useProjectStore } from './stores/project'
 import { openProject } from './utils/file'
 import TitleBar from './components/TitleBar.vue'
 import WorkspaceView from './components/WorkspaceView.vue'
+import HoverTip from './components/ui/HoverTip.vue'
 
 const config = useConfigStore()
 const projectStore = useProjectStore()
@@ -21,6 +22,10 @@ onMounted(async () => {
     if (!result.success) {
       console.log('Error loading project:', filename, result.error)
       config.removeFromHistory(filename)
+      continue
+    }
+    if (projectStore.syncTaskSchedule(result.project)) {
+      await projectStore.saveProject(result.project)
     }
   }
 })
@@ -30,5 +35,6 @@ onMounted(async () => {
   <div class="fixed inset-0 flex flex-col bg-(--bg-primary) overflow-hidden">
     <TitleBar />
     <WorkspaceView />
+    <HoverTip />
   </div>
 </template>
